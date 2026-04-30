@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:sickn33.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(extract-text \"C:\\\\Users\\\\tomom\\\\Downloads\\\\cahier_des_charges_caisse_noire.docx\")",
+      "Bash(pandoc \"C:\\\\Users\\\\tomom\\\\Downloads\\\\cahier_des_charges_caisse_noire.docx\" -t markdown)",
+      "Bash(python 'C:\\\\Users\\\\tomom\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\853d1707-a9cf-4166-8f1c-5497facf02c2\\\\a0a4dd78-2586-4740-b448-932d8ad7d647\\\\skills\\\\docx/scripts/office/unpack.py' 'C:\\\\Users\\\\tomom\\\\Downloads\\\\cahier_des_charges_caisse_noire.docx' 'C:\\\\Users\\\\tomom\\\\Downloads\\\\_cdc_unpacked')",
+      "Bash(python \"/c/Users/tomom/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/853d1707-a9cf-4166-8f1c-5497facf02c2/a0a4dd78-2586-4740-b448-932d8ad7d647/skills/docx/scripts/office/unpack.py\" \"/c/Users/tomom/Downloads/cahier_des_charges_caisse_noire.docx\" \"/c/Users/tomom/Downloads/_cdc_unpacked\")",
+      "Bash(mkdir -p \"/c/Users/tomom/Downloads/_cdc_unpacked\")",
+      "Bash(unzip -o \"/c/Users/tomom/Downloads/cahier_des_charges_caisse_noire.docx\" -d \"/c/Users/tomom/Downloads/_cdc_unpacked\")",
+      "Bash(python -c ' *)",
+      "Read(//c/Users/tomom/Downloads/**)",
+      "Bash(git clone *)",
+      "Bash(mkdir -p '/c/Users/tomom/Proton Drive/tom.omnes/My files/CN/.claude/skills')",
+      "Bash(cp -r /tmp/aas/skills/__TRACKED_VAR__ '/c/Users/tomom/Proton Drive/tom.omnes/My files/CN/.claude/skills/')",
+      "Bash(mkdir -p /c/dev/caisse-noire)",
+      "Read(//c//**)",
+      "Bash(cp -r \"/c/Users/tomom/Proton Drive/tom.omnes/My files/CN/.claude\" \"/c/dev/caisse-noire/\")",
+      "Read(//c/dev/caisse-noire//**)",
+      "Read(//c/dev/caisse-noire/.claude/**)"
+    ]
+  }
+}
