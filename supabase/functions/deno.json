@@ -1,0 +1,18 @@
+{
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 80,
+    "indentWidth": 2,
+    "singleQuote": false
+  },
+  "imports": {
+    "supabase": "jsr:@supabase/supabase-js@2",
+    "bcrypt/": "https://deno.land/x/bcrypt@v0.4.1/",
+    "djwt/": "https://deno.land/x/djwt@v3.0.2/"
+  }
+}
