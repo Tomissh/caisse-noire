@@ -304,6 +304,7 @@ export type Database = {
           id: string
           libelle: string
           montant_centimes: number
+          montant_variable: boolean
           updated_at: string
         }
         Insert: {
@@ -313,6 +314,7 @@ export type Database = {
           id?: string
           libelle: string
           montant_centimes: number
+          montant_variable?: boolean
           updated_at?: string
         }
         Update: {
@@ -322,6 +324,7 @@ export type Database = {
           id?: string
           libelle?: string
           montant_centimes?: number
+          montant_variable?: boolean
           updated_at?: string
         }
         Relationships: [

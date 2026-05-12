@@ -11,8 +11,8 @@ type NavItem = { slug: string; label: string; soon?: boolean };
 const NAV: NavItem[] = [
   { slug: "", label: "Tableau de bord" },
   { slug: "membres", label: "Membres" },
-  { slug: "motifs", label: "Motifs", soon: true },
-  { slug: "ecritures", label: "Écritures", soon: true },
+  { slug: "motifs", label: "Motifs" },
+  { slug: "ecritures", label: "Écritures" },
   { slug: "audit", label: "Audit log", soon: true },
   { slug: "parametres", label: "Paramètres" },
 ];
