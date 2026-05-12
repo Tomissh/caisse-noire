@@ -7,7 +7,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, getServiceRoleKey } from "./env";
-import type { Database } from "./types";
+import type { Database } from "./database.types";
 
 let cached: ReturnType<typeof createClient<Database>> | null = null;
 
