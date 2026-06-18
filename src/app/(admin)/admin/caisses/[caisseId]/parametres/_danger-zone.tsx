@@ -68,6 +68,29 @@ export function DangerZone({
       <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/50 dark:bg-amber-950/30">
         <h2 className="text-sm font-medium text-amber-900 dark:text-amber-200">Zone sensible</h2>
 
+        <div className="space-y-2 text-sm text-amber-800 dark:text-amber-300">
+          <p className="font-medium">Récapitulatif PDF</p>
+          <p className="text-xs">
+            {cloturee
+              ? "Document officiel de clôture, généré à la demande."
+              : "Aperçu (la caisse est encore ouverte — le document peut évoluer)."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/api/caisses/${caisseId}/recap.pdf`}
+              className="rounded-md border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            >
+              Télécharger le récapitulatif
+            </a>
+            <a
+              href={`/api/caisses/${caisseId}/recap.pdf?include_deleted=1`}
+              className="rounded-md border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            >
+              … avec écritures supprimées
+            </a>
+          </div>
+        </div>
+
         {!cloturee && (
           <div className="space-y-2 text-sm text-amber-800 dark:text-amber-300">
             <p>
