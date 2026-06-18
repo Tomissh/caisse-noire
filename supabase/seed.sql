@@ -1,0 +1,6 @@
+-- Seed SQL pour la DB locale Supabase.
+-- Volontairement vide : tout ce qui dépend de auth.users (caisses, membres, etc.)
+-- est créé par tests/setup/seed.ts qui passe par l'API auth.admin pour créer
+-- les utilisateurs proprement, puis insère les données métier avec service-role.
+--
+-- Lancé automatiquement par `supabase db reset` après les migrations.
