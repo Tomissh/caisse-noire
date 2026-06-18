@@ -13,7 +13,7 @@ const NAV: NavItem[] = [
   { slug: "membres", label: "Membres" },
   { slug: "motifs", label: "Motifs" },
   { slug: "ecritures", label: "Écritures" },
-  { slug: "audit", label: "Audit log", soon: true },
+  { slug: "audit", label: "Audit log" },
   { slug: "parametres", label: "Paramètres" },
 ];
 

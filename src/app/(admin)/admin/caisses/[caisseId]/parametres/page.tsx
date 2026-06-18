@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CaisseInfoForm } from "./_info-form";
 import { AdminsBlock } from "./_admins";
+import { DangerZone } from "./_danger-zone";
 
 export default async function ParametresPage({
   params,
@@ -73,14 +74,12 @@ export default async function ParametresPage({
           canManage={canManageAdmins}
         />
 
-        <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/50 dark:bg-amber-950/30">
-          <h2 className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            Zone sensible
-          </h2>
-          <p className="text-xs text-amber-800 dark:text-amber-300">
-            La clôture de la caisse sera disponible en Phase 4.D.
-          </p>
-        </section>
+        <DangerZone
+          caisseId={caisseId}
+          caisseNom={caisse.nom}
+          cloturee={Boolean(caisse.cloturee_at)}
+          role={role}
+        />
       </div>
     </main>
   );

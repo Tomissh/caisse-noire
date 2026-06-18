@@ -15,7 +15,6 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 const BCRYPT_COST = 12;
 const PASSWORD_MIN_LENGTH = 6;
@@ -125,22 +124,8 @@ export async function resetMembrePasswordAction(input: {
 
   if (error) return { ok: false, error: error.message };
 
-  // Trace en audit_log via service-role (pas de policy INSERT publique ;
-  // les triggers ne couvrent pas encore les actions sur membres — TODO 4.D :
-  // ajouter un trigger membres_audit).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  await createAdminClient()
-    .from("audit_log")
-    .insert({
-      caisse_id: parsed.data.caisseId,
-      action: "membre.set_password",
-      entite_type: "membres",
-      entite_id: parsed.data.membreId,
-      acteur_user_id: user?.id ?? null,
-      payload: { self: false, via: "admin_ui" },
-    });
+  // L'INSERT dans audit_log est désormais émis automatiquement par le trigger
+  // membres_audit (migration 20260512173000) avec action 'membre.set_password'.
 
   revalidatePath(`/admin/caisses/${parsed.data.caisseId}/membres`);
   return { ok: true };

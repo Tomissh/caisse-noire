@@ -13,6 +13,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateCaisseCode } from "@/lib/caisse-code";
+import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 
 const uuid = z.uuid();
 
@@ -128,5 +129,56 @@ export async function removeAdminAction(input: {
 
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/caisses/${parsed.data.caisseId}/parametres`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Clôture / réouverture
+// ---------------------------------------------------------------------------
+
+const cloturerSchema = z.object({
+  caisseId: uuid,
+  confirmationNom: z.string().trim().min(1),
+});
+
+export async function cloturerCaisseAction(input: {
+  caisseId: string;
+  confirmationNom: string;
+}): Promise<Result> {
+  const parsed = cloturerSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Paramètres invalides" };
+
+  // Vérifie que le nom retapé correspond bien à la caisse en cours
+  const ctx = await requireCaisseAdmin(parsed.data.caisseId);
+  if (ctx.caisse.cloturee_at) {
+    return { ok: false, error: "La caisse est déjà clôturée" };
+  }
+  if (parsed.data.confirmationNom !== ctx.caisse.nom) {
+    return { ok: false, error: "Le nom retapé ne correspond pas à la caisse" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cloturer_caisse", {
+    p_caisse_id: parsed.data.caisseId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/caisses/${parsed.data.caisseId}`, "layout");
+  return { ok: true };
+}
+
+const reouvrirSchema = z.object({ caisseId: uuid });
+
+export async function reouvrirCaisseAction(input: {
+  caisseId: string;
+}): Promise<Result> {
+  const parsed = reouvrirSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Paramètres invalides" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reouvrir_caisse", {
+    p_caisse_id: parsed.data.caisseId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/caisses/${parsed.data.caisseId}`, "layout");
   return { ok: true };
 }
