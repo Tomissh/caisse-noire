@@ -377,8 +377,11 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+# Expose le JWT secret aux Edge Functions sous le nom canonique attendu en prod.
+# En local, le CLI le stocke dans SUPABASE_INTERNAL_JWT_SECRET qui n'est pas lisible
+# par Deno.env.get à cause de l'allowlist du runtime. On le re-déclare ici.
+SUPABASE_JWT_SECRET = "super-secret-jwt-token-with-at-least-32-characters-long"
 
 [analytics]
 enabled = true

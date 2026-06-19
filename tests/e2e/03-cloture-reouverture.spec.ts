@@ -16,10 +16,10 @@ test("clôture par admin créateur → réouverture par super-admin", async ({ p
   await page.waitForURL(/\/admin\/caisses\/[\da-f-]+$/);
 
   await page.getByRole("link", { name: /paramètres/i }).click();
-  await page.getByRole("button", { name: /clôturer/i }).click();
-  // Confirmation par retape du nom
-  await page.getByLabel(/nom de la caisse/i).fill(FIXTURES.caisse.nom);
-  await page.getByRole("button", { name: /confirmer|clôturer définitivement/i }).click();
+  await page.getByRole("button", { name: "Clôturer la caisse" }).click();
+  // Confirmation par retape du nom (input avec placeholder, pas de label)
+  await page.getByPlaceholder("Nom de la caisse").fill(FIXTURES.caisse.nom);
+  await page.getByRole("button", { name: /confirmer la clôture/i }).click();
 
   await expect(page.getByText(/clôturée/i)).toBeVisible({ timeout: 10_000 });
 

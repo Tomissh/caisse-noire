@@ -2,7 +2,14 @@
 // Pointent par défaut sur la stack Supabase locale (supabase start).
 // En CI on récupère les vraies clés via `supabase status --output env` puis on les exporte.
 
-import "dotenv/config";
+import { config } from "dotenv";
+import path from "node:path";
+
+// Charge .env.test.local en priorité (généré depuis `supabase status -o env`),
+// puis .env.local en fallback (vars d'app prod — anti-pattern pour les tests
+// mais utile si on lance le seed contre la prod en dépannage manuel).
+config({ path: path.resolve(process.cwd(), ".env.test.local") });
+config({ path: path.resolve(process.cwd(), ".env.local") });
 
 function required(name: string, fallback?: string): string {
   const v = process.env[name];
@@ -47,6 +54,6 @@ export const FIXTURES = {
   motifs: [
     { libelle: "Retard à l'entraînement", montantCentimes: 500 },
     { libelle: "Oubli d'équipement", montantCentimes: 200 },
-    { libelle: "Motif libre", montantCentimes: 0, montantVariable: true },
+    { libelle: "Motif libre", montantCentimes: 1000, montantVariable: true },
   ],
 };

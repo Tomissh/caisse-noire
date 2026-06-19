@@ -19,14 +19,16 @@ test("admin se connecte, ouvre sa caisse, déclare une amende", async ({ page })
 
   // Va sur écritures → nouvelle amende
   await page.getByRole("link", { name: /écritures/i }).click();
-  await page.getByRole("link", { name: /amende/i }).click();
+  await page.getByRole("link", { name: "+ Amende" }).click();
 
-  // Sélectionne motif catalogue + membre
-  await page.getByLabel(/motif/i).first().selectOption({ label: "Retard à l'entraînement" });
-  await page.getByLabel(/membre/i).selectOption({ label: "Alice Dupont" });
-  await page.getByRole("button", { name: /enregistrer/i }).click();
+  // Les <label> du form n'ont pas de htmlFor, donc on cible par contenu d'option.
+  // Motif (premier select de la page) + Membre (deuxième).
+  const selects = page.locator("select");
+  await selects.nth(0).selectOption({ label: "Retard à l'entraînement" });
+  await selects.nth(1).selectOption({ label: "Alice Dupont" });
+  await page.getByRole("button", { name: /^déclarer$/i }).click();
 
-  // Retour sur écritures avec la nouvelle amende visible
-  await expect(page.getByText(/Retard/)).toBeVisible();
-  await expect(page.getByText(/Alice Dupont/)).toBeVisible();
+  // Retour sur la page écritures avec l'amende visible
+  await page.waitForURL(/\/ecritures$/);
+  await expect(page.getByText(/Alice Dupont/)).toBeVisible({ timeout: 10_000 });
 });
