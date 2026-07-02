@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
-import "dotenv/config";
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.test.local" });
 
 const PORT = 3000;
 

@@ -378,10 +378,14 @@ inspector_port = 8083
 deno_version = 2
 
 [edge_runtime.secrets]
-# Expose le JWT secret aux Edge Functions sous le nom canonique attendu en prod.
-# En local, le CLI le stocke dans SUPABASE_INTERNAL_JWT_SECRET qui n'est pas lisible
-# par Deno.env.get à cause de l'allowlist du runtime. On le re-déclare ici.
-SUPABASE_JWT_SECRET = "super-secret-jwt-token-with-at-least-32-characters-long"
+# Secret custom utilisé pour signer/vérifier les JWT membres (login-membre,
+# set-password-membre). Le CLI Supabase rejette silencieusement tout secret
+# préfixé SUPABASE_ (namespace réservé à la plateforme) — d'où ce nom custom.
+# Valeur = le JWT secret réel de la stack locale (celui que PostgREST utilise
+# pour vérifier les JWT entrants), affiché par `supabase status`.
+# En prod, définir la même chose avec la vraie valeur du projet via :
+#   supabase secrets set MEMBRE_JWT_SECRET=<legacy JWT secret du dashboard>
+MEMBRE_JWT_SECRET = "super-secret-jwt-token-with-at-least-32-characters-long"
 
 [analytics]
 enabled = true

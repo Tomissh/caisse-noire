@@ -3,10 +3,7 @@
 import { test, expect } from "@playwright/test";
 import { FIXTURES } from "../setup/env";
 
-// Skippé en local CLI Supabase 2.96 : SUPABASE_JWT_SECRET n'est pas exposable à
-// Deno.env.get dans l'Edge Function login-membre (allowlist du runtime).
-// À relancer une fois la CLI mise à jour vers ≥ 2.107 ou via fix upstream Supabase.
-test.skip("membre se connecte avec son code de caisse et voit son solde", async ({ page }) => {
+test("membre se connecte avec son code de caisse et voit son solde", async ({ page }) => {
   const alice = FIXTURES.membres[0]!;
 
   await page.goto("/membre/login");

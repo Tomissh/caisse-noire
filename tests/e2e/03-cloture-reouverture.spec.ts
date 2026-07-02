@@ -32,9 +32,15 @@ test("clôture par admin créateur → réouverture par super-admin", async ({ p
   await page.getByRole("button", { name: /se connecter/i }).click();
   await page.waitForURL("**/admin");
 
-  await page.getByRole("link", { name: /super|réouvrir|caisses clôturées/i }).first().click();
-  await page.getByRole("button", { name: /réouvrir/i }).click();
+  // Pas de lien depuis /admin → on navigue directement à /admin/super/caisses
+  await page.goto("/admin/super/caisses");
 
-  // Retour caisse active
-  await expect(page.getByText(/clôturée/i)).toBeHidden({ timeout: 10_000 });
+  // Le ReouvrirButton invoque window.confirm — on l'accepte automatiquement.
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: /^réouvrir$/i }).click();
+
+  // La caisse devient "ouverte" — le badge "clôturée" disparaît de la ligne.
+  await expect(
+    page.getByRole("listitem").filter({ hasText: FIXTURES.caisse.nom }).getByText(/ouverte/i),
+  ).toBeVisible({ timeout: 10_000 });
 });

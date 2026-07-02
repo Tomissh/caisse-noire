@@ -1,7 +1,7 @@
 // Edge Function : login-membre
 //
-// Vérifie (code_caisse, nom, mot_de_passe) → renvoie un JWT custom
-// signé avec le SUPABASE_JWT_SECRET portant les claims :
+// Vérifie (code_caisse, prenom, nom, mot_de_passe) → renvoie un JWT custom
+// signé avec le MEMBRE_JWT_SECRET portant les claims :
 //   { aud: 'authenticated', role: 'authenticated', sub: <membre_id>,
 //     app_role: 'membre', caisse_id, membre_id, exp }
 //
