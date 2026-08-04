@@ -59,7 +59,7 @@ caisse-noire/
 |------------|-------------------------------------------------------------|----------------------------------------------------------------------------|
 | Créateur   | Supabase Auth                                               | Tout, y compris clôture de caisse et suppression                           |
 | Admin      | Supabase Auth                                               | Tout sauf clôture et suppression                                           |
-| Membre     | Code caisse + mot de passe (hashé SHA-256 côté client)      | Consultation, déclaration amendes, paiement. Session en `sessionStorage`.  |
+| Membre     | Code caisse + mot de passe (hashé SHA-256 côté client)      | Consultation uniquement (solde, historique amendes/paiements/retraits). Aucune saisie. Session en `sessionStorage`. |
 
 **Alternative recommandée** : bcrypt via Edge Function plutôt que SHA-256 client (plus sûr). Voir CDC 8.4.
 
@@ -85,15 +85,17 @@ npm run dev          # Dev server
 npm run build        # Build prod
 npm run lint         # ESLint
 npx tsc --noEmit     # Typecheck
+npm test             # Tests (Vitest, une fois)
+npm run test:watch   # Tests (Vitest, watch mode)
 ```
 
 ## Phases de déploiement
 
 1. ✅ **Setup** — Next, Tailwind, shadcn, structure, configs.
-2. **DB Supabase** — Schéma, migrations, RLS, types TS générés.
-3. **Architecture** — Clients Supabase, AuthContext, layouts, thème.
-4. **Features** — Login → Dashboard → Admin → Amendes → Paiements → Historique → Clôture.
-5. **Polish** — Palette finale, perf mobile, tests, domaine custom.
+2. ✅ **DB Supabase** — Schéma, migrations, RLS, types TS générés.
+3. ✅ **Architecture** — Clients Supabase, AuthContext, layouts, thème.
+4. ✅ **Features** — Login → Dashboard → Admin → Amendes → Paiements → Historique → Clôture.
+5. **Polish** — Hébergement Vercel + Supabase accessibles, palette finale, perf mobile, tests, domaine custom.
 
 ## Contraintes infra à ne pas oublier
 
