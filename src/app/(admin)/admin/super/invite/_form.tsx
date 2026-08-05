@@ -10,13 +10,22 @@ import { generatePassword } from "@/lib/caisse-code";
 
 const schema = z.object({
   email: z.email("Email invalide"),
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9._-]{3,32}$/, "3-32 caractères : lettres, chiffres, . _ -"),
   password: z.string().min(8, "≥ 8 caractères").max(200),
   makeSuperAdmin: z.boolean(),
 });
 type Values = z.infer<typeof schema>;
 
 export function InviteForm() {
-  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [created, setCreated] = useState<{
+    email: string;
+    username: string;
+    password: string;
+  } | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -27,7 +36,7 @@ export function InviteForm() {
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "", makeSuperAdmin: false },
+    defaultValues: { email: "", username: "", password: "", makeSuperAdmin: false },
   });
 
   const onGenerate = () => {
@@ -42,9 +51,9 @@ export function InviteForm() {
       toast.error(res.error);
       return;
     }
-    setCreated({ email: v.email, password: res.password });
+    setCreated({ email: v.email, username: v.username, password: res.password });
     toast.success("Compte créé");
-    reset({ email: "", password: "", makeSuperAdmin: false });
+    reset({ email: "", username: "", password: "", makeSuperAdmin: false });
   };
 
   if (created) {
@@ -57,6 +66,12 @@ export function InviteForm() {
           Notez ces identifiants — le mot de passe n&apos;apparaîtra plus.
         </p>
         <dl className="space-y-2 text-sm">
+          <div>
+            <dt className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+              Nom d&apos;utilisateur
+            </dt>
+            <dd className="font-mono text-zinc-900 dark:text-zinc-50">{created.username}</dd>
+          </div>
           <div>
             <dt className="text-xs font-medium text-emerald-800 dark:text-emerald-300">Email</dt>
             <dd className="font-mono text-zinc-900 dark:text-zinc-50">{created.email}</dd>
@@ -95,6 +110,21 @@ export function InviteForm() {
         />
         {errors.email && (
           <p className="text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          Nom d&apos;utilisateur (pour se connecter)
+        </label>
+        <input
+          type="text"
+          autoComplete="off"
+          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+          {...register("username")}
+        />
+        {errors.username && (
+          <p className="text-xs text-red-600 dark:text-red-400">{errors.username.message}</p>
         )}
       </div>
 

@@ -1,5 +1,5 @@
 // Layout (membre) : enveloppe les pages membre avec MembreAuthProvider qui
-// lit le JWT depuis sessionStorage (côté client). Pas de garde serveur
+// lit le JWT depuis localStorage (côté client). Pas de garde serveur
 // possible (cookie absent — c'est un header Authorization à la demande).
 
 import { MembreAuthProvider } from "@/lib/auth/membre-context";

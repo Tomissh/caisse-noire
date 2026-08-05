@@ -84,8 +84,16 @@ export default function MembreDashboardPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const [caisseRes, moiRes, situationsRes, soldeRes, amendesRes, paiementsRes, retraitsRes] =
-          await Promise.all([
+        const [
+          caisseRes,
+          moiRes,
+          membresRes,
+          situationsRes,
+          soldeRes,
+          amendesRes,
+          paiementsRes,
+          retraitsRes,
+        ] = await Promise.all([
             supabase
               .from("caisses")
               .select("nom, code")
@@ -97,10 +105,12 @@ export default function MembreDashboardPage() {
               .eq("id", claims.membre_id)
               .maybeSingle(),
             supabase
+              .from("membres")
+              .select("id, prenom, nom, actif")
+              .eq("caisse_id", claims.caisse_id),
+            supabase
               .from("v_membre_situation")
-              .select(
-                "membre_id, total_amendes_centimes, total_paiements_centimes, solde_centimes, membres!inner(prenom, nom, actif)",
-              )
+              .select("membre_id, total_amendes_centimes, total_paiements_centimes, solde_centimes")
               .eq("caisse_id", claims.caisse_id),
             supabase
               .from("v_caisse_solde")
@@ -133,25 +143,34 @@ export default function MembreDashboardPage() {
 
         if (cancelled) return;
 
-        const situationsRaw = (situationsRes.data ?? []) as unknown as {
-          membre_id: string | null;
-          total_amendes_centimes: number | null;
-          total_paiements_centimes: number | null;
-          solde_centimes: number | null;
-          membres: { prenom: string; nom: string; actif: boolean } | null;
-        }[];
+        // Deux requêtes séparées (membres + v_membre_situation) fusionnées
+        // ici : une vue n'expose pas de clé étrangère réelle vers `membres`,
+        // un embed PostgREST membres!inner(...) à travers elle échoue
+        // silencieusement (PGRST200).
+        const situationByMembreId = new Map<
+          string,
+          {
+            total_amendes_centimes: number | null;
+            total_paiements_centimes: number | null;
+            solde_centimes: number | null;
+          }
+        >();
+        for (const r of situationsRes.data ?? []) {
+          if (r.membre_id) situationByMembreId.set(r.membre_id, r);
+        }
 
-        const situations: Situation[] = situationsRaw
-          .filter((r) => r.membres !== null)
-          .map((r) => ({
-            membre_id: r.membre_id,
-            total_amendes_centimes: r.total_amendes_centimes,
-            total_paiements_centimes: r.total_paiements_centimes,
-            solde_centimes: r.solde_centimes,
-            prenom: r.membres!.prenom,
-            nom: r.membres!.nom,
-            actif: r.membres!.actif,
-          }));
+        const situations: Situation[] = (membresRes.data ?? []).map((m) => {
+          const s = situationByMembreId.get(m.id);
+          return {
+            membre_id: m.id,
+            total_amendes_centimes: s?.total_amendes_centimes ?? 0,
+            total_paiements_centimes: s?.total_paiements_centimes ?? 0,
+            solde_centimes: s?.solde_centimes ?? 0,
+            prenom: m.prenom,
+            nom: m.nom,
+            actif: m.actif,
+          };
+        });
 
         const mySit = situations.find((s) => s.membre_id === claims.membre_id);
 
@@ -215,51 +234,40 @@ export default function MembreDashboardPage() {
           Bienvenue{data.moi ? `, ${data.moi.prenom}` : ""}
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Caisse : <span className="font-medium">{data.caisseNom}</span>{" "}
-          <span className="font-mono text-xs text-zinc-500">({data.caisseCode})</span>
+          Caisse : <span className="font-medium">{data.caisseNom}</span>
         </p>
       </header>
 
-      {/* Mon solde ------------------------------------------------------ */}
+      {/* Top 3 payeurs --------------------------------------------------- */}
       <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Mon solde
+          Top 3 payeurs
         </div>
-        <div
-          className={`mt-1 font-mono text-3xl font-semibold ${
-            data.monSolde > 0
-              ? "text-emerald-600 dark:text-emerald-400"
-              : data.monSolde < 0
-                ? "text-red-600 dark:text-red-400"
-                : "text-zinc-700 dark:text-zinc-300"
-          }`}
-        >
-          {formatSolde(data.monSolde)}
-        </div>
-        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-          {data.monSolde > 0
-            ? "Avance reportée pour les prochaines amendes."
-            : data.monSolde < 0
-              ? "Vous avez une dette à régler."
-              : "Compte à zéro."}
-        </p>
-        <div className="mt-4 flex gap-6 text-xs text-zinc-600 dark:text-zinc-400">
-          <span>
-            Amendes :{" "}
-            <span className="font-mono text-red-600 dark:text-red-400">
-              {formatEuros(data.monTotalAmendes)}
-            </span>
-          </span>
-          <span>
-            Paiements :{" "}
-            <span className="font-mono text-emerald-600 dark:text-emerald-400">
-              {formatEuros(data.monTotalPaiements)}
-            </span>
-          </span>
-        </div>
+        {top3Payeurs.length === 0 ? (
+          <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Aucun paiement.</div>
+        ) : (
+          <ol className="mt-2 space-y-1 text-sm">
+            {top3Payeurs.map((p, i) => (
+              <li
+                key={p.membre_id}
+                className="flex items-center justify-between text-zinc-700 dark:text-zinc-300"
+              >
+                <span>
+                  <span className="mr-1 inline-block w-4 text-zinc-500 dark:text-zinc-400">
+                    {i + 1}.
+                  </span>
+                  {p.prenom} {p.nom}
+                </span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                  {formatEuros(p.total_paiements_centimes ?? 0)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
-      {/* Solde caisse + top 3 ----------------------------------------- */}
+      {/* Solde caisse + mon solde --------------------------------------- */}
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -271,30 +279,33 @@ export default function MembreDashboardPage() {
         </div>
         <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Top 3 payeurs
+            Mon solde
           </div>
-          {top3Payeurs.length === 0 ? (
-            <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Aucun paiement.</div>
-          ) : (
-            <ol className="mt-1 space-y-0.5 text-sm">
-              {top3Payeurs.map((p, i) => (
-                <li
-                  key={p.membre_id}
-                  className="flex items-center justify-between text-zinc-700 dark:text-zinc-300"
-                >
-                  <span>
-                    <span className="mr-1 inline-block w-4 text-zinc-500 dark:text-zinc-400">
-                      {i + 1}.
-                    </span>
-                    {p.prenom} {p.nom}
-                  </span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                    {formatEuros(p.total_paiements_centimes ?? 0)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <div
+            className={`mt-1 font-mono text-2xl font-semibold ${
+              data.monSolde > 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : data.monSolde < 0
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-zinc-700 dark:text-zinc-300"
+            }`}
+          >
+            {formatSolde(data.monSolde)}
+          </div>
+          <div className="mt-2 flex gap-4 text-xs text-zinc-600 dark:text-zinc-400">
+            <span>
+              Amendes :{" "}
+              <span className="font-mono text-red-600 dark:text-red-400">
+                {formatEuros(data.monTotalAmendes)}
+              </span>
+            </span>
+            <span>
+              Paiements :{" "}
+              <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                {formatEuros(data.monTotalPaiements)}
+              </span>
+            </span>
+          </div>
         </div>
       </section>
 

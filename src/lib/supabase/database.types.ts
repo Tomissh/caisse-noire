@@ -12,33 +12,26 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      admin_profiles: {
+        Row: {
+          created_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
       admins_caisse: {
         Row: {
           caisse_id: string
@@ -515,6 +508,22 @@ export type Database = {
       is_membre_of: { Args: { p_caisse_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       reouvrir_caisse: { Args: { p_caisse_id: string }; Returns: undefined }
+      resolve_username_email: { Args: { p_username: string }; Returns: string }
+      situation_caisse_mois: {
+        Args: { p_caisse_id: string; p_mois: string }
+        Returns: {
+          actif: boolean
+          amendes_mois_centimes: number
+          avance_centimes: number
+          membre_id: string
+          montant_a_payer_centimes: number
+          nom: string
+          paiements_mois_centimes: number
+          prenom: string
+          solde_apres_centimes: number
+          solde_avant_centimes: number
+        }[]
+      }
       situation_membre_par_mois: {
         Args: { p_membre_id: string }
         Returns: {
@@ -671,9 +680,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       moyen_paiement: ["especes", "virement", "autre"],

@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET")!;
+  const JWT_SECRET = Deno.env.get("MEMBRE_JWT_SECRET")!;
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
   if (!SUPABASE_URL || !SERVICE_ROLE || !JWT_SECRET || !ANON_KEY) {

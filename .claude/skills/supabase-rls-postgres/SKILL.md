@@ -273,9 +273,15 @@ export const adminClient = () =>
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=     # server-only, jamais NEXT_PUBLIC_
-SUPABASE_JWT_SECRET=           # pour signer les JWT membres (option A)
-MEMBRE_JWT_SECRET=             # alternatif, secret custom dédié
+MEMBRE_JWT_SECRET=             # secret pour signer les JWT membres (Edge Functions)
 ```
+
+⚠️ `supabase secrets set` refuse tout nom préfixé `SUPABASE_` (réservé aux clés
+auto-injectées) — utiliser exclusivement `MEMBRE_JWT_SECRET`, jamais
+`SUPABASE_JWT_SECRET`, dans les Edge Functions (`login-membre`,
+`set-password-membre`). La valeur doit rester le JWT Secret legacy du projet
+(Dashboard > Project Settings > API > JWT Settings) pour que PostgREST valide
+les tokens signés côté Edge Function.
 
 ## Erreurs fréquentes à éviter
 1. Oublier `enable row level security` → table accessible à tous les users authenticated.

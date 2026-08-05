@@ -1,5 +1,15 @@
 "use client";
 
+// Connexion admin : accepte soit l'email, soit le nom d'utilisateur choisi
+// à la création du compte (resolve_username_email). Les comptes créés
+// avant l'ajout du username (ex. le tout premier créateur, provisionné
+// manuellement) n'ont pas de username — ils se connectent avec leur email,
+// détecté via la présence d'un "@".
+//
+// Message d'erreur volontairement générique dans tous les cas (identifiant
+// inconnu, username sans compte, mauvais mot de passe) pour ne pas
+// faciliter l'énumération des comptes.
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,11 +19,13 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 const schema = z.object({
-  email: z.email("Email invalide"),
+  identifiant: z.string().trim().min(1, "Champ requis"),
   password: z.string().min(6, "Mot de passe trop court"),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+const GENERIC_ERROR = "Identifiants invalides";
 
 export function AdminLoginForm() {
   const router = useRouter();
@@ -25,15 +37,29 @@ export function AdminLoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { identifiant: "", password: "" },
   });
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword(values);
+
+    let email = values.identifiant;
+    if (!email.includes("@")) {
+      const { data, error: rpcError } = await supabase.rpc("resolve_username_email", {
+        p_username: values.identifiant,
+      });
+      if (rpcError || !data) {
+        setServerError(GENERIC_ERROR);
+        toast.error("Connexion impossible");
+        return;
+      }
+      email = data;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password: values.password });
     if (error) {
-      setServerError(error.message);
+      setServerError(GENERIC_ERROR);
       toast.error("Connexion impossible");
       return;
     }
@@ -49,18 +75,22 @@ export function AdminLoginForm() {
       noValidate
     >
       <div className="space-y-1">
-        <label htmlFor="email" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-          Email
+        <label
+          htmlFor="identifiant"
+          className="text-xs font-medium text-zinc-700 dark:text-zinc-300"
+        >
+          Identifiant
         </label>
         <input
-          id="email"
-          type="email"
-          autoComplete="email"
+          id="identifiant"
+          type="text"
+          autoComplete="username"
+          placeholder="Nom d'utilisateur ou email"
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-          {...register("email")}
+          {...register("identifiant")}
         />
-        {errors.email && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>
+        {errors.identifiant && (
+          <p className="text-xs text-red-600 dark:text-red-400">{errors.identifiant.message}</p>
         )}
       </div>
 

@@ -1,6 +1,6 @@
 // Page de connexion membre.
 // Auth via l'Edge Function login-membre (code_caisse + prénom + nom + mdp),
-// qui renvoie un JWT custom stocké en sessionStorage.
+// qui renvoie un JWT custom stocké en localStorage (30 j).
 
 import { MembreLoginForm } from "./_form";
 

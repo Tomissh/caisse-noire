@@ -7,8 +7,16 @@
 //   - Total retraits (signe absolu = somme nette)
 //   - Nombre de membres actifs
 //
+// Actions rapides : nouvelle amende / nouveau paiement / nouveau retrait.
+//
+// Récapitulatif mensuel : ce que chaque membre doit encore payer pour un
+// mois donné, en tenant compte de son solde reporté (avance/retard) —
+// RPC situation_caisse_mois, navigable par mois via ?mois=YYYY-MM.
+//
 // Soldes par membre : liste de cards triée par solde décroissant
-// (créditeurs en haut, dettes en bas), via v_membre_situation.
+// (créditeurs en haut, dettes en bas). Requête en deux temps (membres +
+// v_membre_situation) car PostgREST ne sait pas embarquer une relation à
+// travers une vue sans clé étrangère réelle.
 //
 // 5 dernières écritures (3 types unifiés, sort created_at desc).
 
@@ -19,15 +27,34 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatEuros, formatSolde } from "@/lib/format";
 import type { EcritureItem } from "./ecritures/_components/list";
 import { EcrituresList } from "./ecritures/_components/list";
+import { MonthNav } from "./_components/month-nav";
+
+function currentMonthDefault(): string {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function moisLabel(mois: string): string {
+  const [y, m] = mois.split("-").map(Number);
+  const d = new Date(Date.UTC(y ?? 2026, (m ?? 1) - 1, 1));
+  const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 export default async function CaisseDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ caisseId: string }>;
+  searchParams: Promise<{ mois?: string }>;
 }) {
   const { caisseId } = await params;
+  const { mois: moisParam } = await searchParams;
   const ctx = await requireCaisseAdmin(caisseId);
   const supabase = await createClient();
+
+  const mois = /^\d{4}-\d{2}$/.test(moisParam ?? "") ? moisParam! : currentMonthDefault();
 
   const [
     soldeRes,
@@ -35,7 +62,9 @@ export default async function CaisseDashboardPage({
     paiementsSumRes,
     retraitsSumRes,
     membresActifsRes,
+    membresRes,
     situationsRes,
+    recapMoisRes,
     amendesLastRes,
     paiementsLastRes,
     retraitsLastRes,
@@ -57,10 +86,12 @@ export default async function CaisseDashboardPage({
       .select("id", { count: "exact", head: true })
       .eq("caisse_id", caisseId)
       .eq("actif", true),
+    supabase.from("membres").select("id, prenom, nom, actif").eq("caisse_id", caisseId),
     supabase
       .from("v_membre_situation")
-      .select("membre_id, total_amendes_centimes, total_paiements_centimes, solde_centimes, membres!inner(id, prenom, nom, actif)")
+      .select("membre_id, solde_centimes")
       .eq("caisse_id", caisseId),
+    supabase.rpc("situation_caisse_mois", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
     supabase
       .from("amendes")
       .select(
@@ -99,22 +130,31 @@ export default async function CaisseDashboardPage({
   const soldePhysique = soldeRes.data?.solde_centimes ?? totalPaiements - totalRetraits;
   const nbMembresActifs = membresActifsRes.count ?? 0;
 
-  // Soldes par membre : tri solde décroissant
-  type SituationRow = {
-    membre_id: string | null;
-    solde_centimes: number | null;
-    membres: { id: string; prenom: string; nom: string; actif: boolean } | null;
-  };
-  const soldesParMembre = ((situationsRes.data as unknown as SituationRow[]) ?? [])
-    .filter((r) => r.membres !== null)
-    .map((r) => ({
-      membreId: r.membre_id ?? "",
-      prenom: r.membres!.prenom,
-      nom: r.membres!.nom,
-      actif: r.membres!.actif,
-      solde: r.solde_centimes ?? 0,
+  // Soldes par membre : deux requêtes séparées (membres + v_membre_situation)
+  // fusionnées côté client, plutôt qu'un embed PostgREST qui échoue silen-
+  // cieusement (une vue n'expose pas de clé étrangère vers `membres`).
+  const soldeByMembreId = new Map<string, number>();
+  for (const r of situationsRes.data ?? []) {
+    if (r.membre_id) soldeByMembreId.set(r.membre_id, r.solde_centimes ?? 0);
+  }
+  const soldesParMembre = (membresRes.data ?? [])
+    .map((m) => ({
+      membreId: m.id,
+      prenom: m.prenom,
+      nom: m.nom,
+      actif: m.actif,
+      solde: soldeByMembreId.get(m.id) ?? 0,
     }))
     .sort((a, b) => b.solde - a.solde);
+
+  // Récapitulatif mensuel
+  const recapRows = [...(recapMoisRes.data ?? [])].sort((a, b) => {
+    if (b.montant_a_payer_centimes !== a.montant_a_payer_centimes) {
+      return b.montant_a_payer_centimes - a.montant_a_payer_centimes;
+    }
+    return a.prenom.localeCompare(b.prenom);
+  });
+  const totalAPayer = recapRows.reduce((s, r) => s + r.montant_a_payer_centimes, 0);
 
   // Résolution emails déclarants pour les écritures du dashboard
   const userIds = new Set<string>();
@@ -193,13 +233,36 @@ export default async function CaisseDashboardPage({
   return (
     <main className="flex-1 px-6 py-8">
       <div className="mx-auto w-full max-w-5xl space-y-8">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {ctx.caisse.nom}
-          </h1>
-          {ctx.caisse.description && (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">{ctx.caisse.description}</p>
-          )}
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              {ctx.caisse.nom}
+            </h1>
+            {ctx.caisse.description && (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{ctx.caisse.description}</p>
+            )}
+          </div>
+          {/* Actions rapides ------------------------------------------- */}
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/admin/caisses/${caisseId}/ecritures/amende/new`}
+              className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            >
+              + Amende
+            </Link>
+            <Link
+              href={`/admin/caisses/${caisseId}/ecritures/paiement/new`}
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              + Paiement
+            </Link>
+            <Link
+              href={`/admin/caisses/${caisseId}/ecritures/retrait/new`}
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              + Retrait
+            </Link>
+          </div>
         </header>
 
         {/* KPI cards ---------------------------------------------------- */}
@@ -209,6 +272,99 @@ export default async function CaisseDashboardPage({
           <KpiCard label="Total paiements" value={formatEuros(totalPaiements)} accent="green" />
           <KpiCard label="Total retraits" value={formatEuros(totalRetraits)} accent="orange" />
           <KpiCard label="Membres actifs" value={String(nbMembresActifs)} />
+        </section>
+
+        {/* Récapitulatif mensuel ----------------------------------------- */}
+        <section className="space-y-3">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+                Récapitulatif mensuel
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{moisLabel(mois)}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <MonthNav mois={mois} caisseId={caisseId} />
+              <a
+                href={`/api/caisses/${caisseId}/recap-mensuel.pdf?mois=${mois}`}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Export PDF
+              </a>
+            </div>
+          </header>
+          {recapRows.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+              Aucun membre.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                    <th className="px-3 py-2">Membre</th>
+                    <th className="px-3 py-2 text-right">Solde reporté</th>
+                    <th className="px-3 py-2 text-right">Amendes du mois</th>
+                    <th className="px-3 py-2 text-right">Payé ce mois</th>
+                    <th className="px-3 py-2 text-right">À payer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recapRows.map((r) => (
+                    <tr
+                      key={r.membre_id}
+                      className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800/60 ${
+                        r.actif ? "" : "opacity-60"
+                      }`}
+                    >
+                      <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-50">
+                        {r.prenom} {r.nom}
+                        {!r.actif && (
+                          <span className="ml-1.5 text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
+                            (désactivé)
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
+                        {formatSolde(r.solde_avant_centimes)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-zinc-900 dark:text-zinc-50">
+                        {formatEuros(r.amendes_mois_centimes)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
+                        {formatEuros(r.paiements_mois_centimes)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold">
+                        {r.montant_a_payer_centimes > 0 ? (
+                          <span className="text-red-600 dark:text-red-400">
+                            {formatEuros(r.montant_a_payer_centimes)}
+                          </span>
+                        ) : r.avance_centimes > 0 ? (
+                          <span className="text-emerald-600 dark:text-emerald-400">
+                            à jour (+{formatEuros(r.avance_centimes)})
+                          </span>
+                        ) : (
+                          <span className="text-zinc-500">à jour</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {totalAPayer > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-zinc-200 bg-zinc-50 font-semibold dark:border-zinc-800 dark:bg-zinc-900">
+                      <td className="px-3 py-2" colSpan={4}>
+                        Total restant à payer
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-red-600 dark:text-red-400">
+                        {formatEuros(totalAPayer)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          )}
         </section>
 
         {/* Soldes par membre ------------------------------------------- */}

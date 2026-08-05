@@ -81,6 +81,7 @@ export async function GET(
   const [
     soldeRes,
     membresActifsRes,
+    membresRes,
     situationsRes,
     amendesRes,
     paiementsRes,
@@ -93,11 +94,10 @@ export async function GET(
       .select("id", { count: "exact", head: true })
       .eq("caisse_id", caisseId)
       .eq("actif", true),
+    supabase.from("membres").select("id, prenom, nom, actif").eq("caisse_id", caisseId),
     supabase
       .from("v_membre_situation")
-      .select(
-        "membre_id, total_amendes_centimes, total_paiements_centimes, solde_centimes, membres!inner(prenom, nom, actif)",
-      )
+      .select("membre_id, total_amendes_centimes, total_paiements_centimes, solde_centimes")
       .eq("caisse_id", caisseId),
     amendesQuery,
     paiementsQuery,
@@ -156,25 +156,35 @@ export async function GET(
 
   // ------------------------------------------------------------------------
   // Mapping vers RecapData
+  //
+  // Deux requêtes séparées (membres + v_membre_situation) fusionnées ici,
+  // plutôt qu'un embed PostgREST membres!inner(...) à travers la vue : une
+  // vue n'expose pas de clé étrangère réelle vers `membres`, l'embed échoue
+  // silencieusement (PGRST200) et la liste ressort vide.
   // ------------------------------------------------------------------------
-  type SituationRow = {
-    total_amendes_centimes: number | null;
-    total_paiements_centimes: number | null;
-    solde_centimes: number | null;
-    membres: { prenom: string; nom: string; actif: boolean } | null;
-  };
-  const membres: MembreLigne[] = (
-    (situationsRes.data as unknown as SituationRow[]) ?? []
-  )
-    .filter((r) => r.membres !== null)
-    .map((r) => ({
-      prenom: r.membres!.prenom,
-      nom: r.membres!.nom,
-      actif: r.membres!.actif,
+  const situationByMembreId = new Map<
+    string,
+    { totalAmendesCentimes: number; totalPaiementsCentimes: number; soldeCentimes: number }
+  >();
+  for (const r of situationsRes.data ?? []) {
+    if (!r.membre_id) continue;
+    situationByMembreId.set(r.membre_id, {
       totalAmendesCentimes: r.total_amendes_centimes ?? 0,
       totalPaiementsCentimes: r.total_paiements_centimes ?? 0,
       soldeCentimes: r.solde_centimes ?? 0,
-    }));
+    });
+  }
+  const membres: MembreLigne[] = (membresRes.data ?? []).map((m) => {
+    const s = situationByMembreId.get(m.id);
+    return {
+      prenom: m.prenom,
+      nom: m.nom,
+      actif: m.actif,
+      totalAmendesCentimes: s?.totalAmendesCentimes ?? 0,
+      totalPaiementsCentimes: s?.totalPaiementsCentimes ?? 0,
+      soldeCentimes: s?.soldeCentimes ?? 0,
+    };
+  });
 
   const amendes: EcritureLigne[] = amendesRows.map((a) => {
     const m = (a.membres as unknown as { prenom: string; nom: string } | null) ?? null;

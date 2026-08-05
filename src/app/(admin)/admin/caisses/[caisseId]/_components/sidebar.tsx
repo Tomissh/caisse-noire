@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
+import { useAdminAuth } from "@/lib/auth/admin-context";
 import type { AdminRole } from "@/lib/auth/roles";
 
 type NavItem = { slug: string; label: string; soon?: boolean };
@@ -13,7 +14,7 @@ const NAV: NavItem[] = [
   { slug: "membres", label: "Membres" },
   { slug: "motifs", label: "Motifs" },
   { slug: "ecritures", label: "Écritures" },
-  { slug: "audit", label: "Audit log" },
+  { slug: "audit", label: "Historique" },
   { slug: "parametres", label: "Paramètres" },
 ];
 
@@ -32,6 +33,7 @@ export function CaisseSidebar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { signOut } = useAdminAuth();
 
   const base = `/admin/caisses/${caisseId}`;
   const items = NAV.map((n) => {
@@ -53,13 +55,16 @@ export function CaisseSidebar({
   const sidebarContent = (
     <>
       <div className="border-b border-zinc-200 px-4 py-4 dark:border-zinc-800">
+        <Link href="/admin" className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Caisse Noire
+        </Link>
         <Link
           href="/admin"
-          className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          className="mt-1 block text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
         >
           ← Mes caisses
         </Link>
-        <div className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">{nom}</div>
+        <div className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">{nom}</div>
         <div className="mt-1 flex items-center gap-2 text-xs">
           <span className="font-mono text-zinc-600 dark:text-zinc-400">{code}</span>
           <button
@@ -100,6 +105,15 @@ export function CaisseSidebar({
           </Link>
         ))}
       </nav>
+      <div className="border-t border-zinc-200 px-2 py-3 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          Se déconnecter
+        </button>
+      </div>
     </>
   );
 

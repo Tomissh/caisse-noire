@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { useAdminAuth } from "@/lib/auth/admin-context";
 
-export function AdminTopbar({
-  email,
-  isSuperAdmin,
-}: {
-  email: string | null;
-  isSuperAdmin: boolean;
-}) {
+export function AdminTopbar({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const { signOut } = useAdminAuth();
 
   return (
@@ -23,7 +17,6 @@ export function AdminTopbar({
             super-admin
           </span>
         )}
-        {email && <span className="hidden sm:inline">{email}</span>}
         <button
           type="button"
           onClick={() => signOut()}

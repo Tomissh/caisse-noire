@@ -3,10 +3,11 @@
 // MembreAuthContext : authentification membre via JWT custom signé par
 // l'Edge Function login-membre.
 //
-// Le JWT est stocké en sessionStorage (perdu à la fermeture d'onglet, plus
-// sûr que localStorage pour ce flow sans refresh). Les claims sont décodés
-// côté client à partir du payload base64. Un timer déclenche un signOut
-// automatique à l'expiration (12 h max).
+// Le JWT est stocké en localStorage (persiste à la fermeture du navigateur,
+// pour éviter une reconnexion à chaque visite — accès membre en lecture
+// seule, risque limité). Les claims sont décodés côté client à partir du
+// payload base64. Un timer déclenche un signOut automatique à l'expiration
+// (30 j max).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +18,10 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { MembreClaims } from "./roles";
 
 const STORAGE_KEY = "cn.membre.jwt";
+// setTimeout clamp navigateur : un délai > ~24,8 jours (2^31-1 ms) déborde et
+// se déclenche immédiatement. Avec des sessions de 30 j il faut re-planifier
+// par tranches.
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 type MembreAuthValue = {
   accessToken: string;
@@ -51,12 +56,12 @@ function decodeClaims(token: string): MembreClaims | null {
 
 /** Persiste le JWT et déclenche le rendu de l'app membre. */
 export function storeMembreSession(accessToken: string): void {
-  sessionStorage.setItem(STORAGE_KEY, accessToken);
+  localStorage.setItem(STORAGE_KEY, accessToken);
 }
 
 /** Vide la session sans hook (utilisable côté page de login). */
 export function clearMembreSession(): void {
-  sessionStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 type ProviderState =
@@ -72,14 +77,14 @@ export function MembreAuthProvider({ children }: { children: React.ReactNode }) 
   // Hydratation au mount + sur événement storage (autres onglets).
   useEffect(() => {
     const load = () => {
-      const token = sessionStorage.getItem(STORAGE_KEY);
+      const token = localStorage.getItem(STORAGE_KEY);
       if (!token) {
         setState({ status: "absent" });
         return;
       }
       const claims = decodeClaims(token);
       if (!claims || claims.exp * 1000 <= Date.now()) {
-        sessionStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
         setState({ status: "absent" });
         return;
       }
@@ -90,16 +95,21 @@ export function MembreAuthProvider({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener("storage", load);
   }, []);
 
-  // Auto-logout à l'expiration du JWT.
+  // Auto-logout à l'expiration du JWT (re-planifié par tranches de
+  // MAX_TIMEOUT_MS pour les sessions longues, cf. setTimeout clamp).
   useEffect(() => {
     if (state.status !== "ready") return;
-    const ms = state.claims.exp * 1000 - Date.now();
-    if (ms <= 0) return;
-    timerRef.current = setTimeout(() => {
-      sessionStorage.removeItem(STORAGE_KEY);
-      toast.error("Session expirée, reconnectez-vous");
-      router.replace("/membre/login");
-    }, ms);
+    const schedule = () => {
+      const ms = state.claims.exp * 1000 - Date.now();
+      if (ms <= 0) {
+        localStorage.removeItem(STORAGE_KEY);
+        toast.error("Session expirée, reconnectez-vous");
+        router.replace("/membre/login");
+        return;
+      }
+      timerRef.current = setTimeout(schedule, Math.min(ms, MAX_TIMEOUT_MS));
+    };
+    schedule();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -114,7 +124,7 @@ export function MembreAuthProvider({ children }: { children: React.ReactNode }) 
 
   const signOut = useCallback(
     (reason: "manual" | "expired" = "manual") => {
-      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
       if (reason === "expired") toast.error("Session expirée, reconnectez-vous");
       router.replace("/membre/login");
     },

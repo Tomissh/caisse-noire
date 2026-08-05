@@ -14,7 +14,7 @@ import bcrypt from "npm:bcryptjs@2.4.3";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const SESSION_DURATION_SECONDS = 12 * 60 * 60; // 12 h
+const SESSION_DURATION_SECONDS = 30 * 24 * 60 * 60; // 30 j
 
 interface LoginPayload {
   code_caisse: string;
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET")!;
+  const JWT_SECRET = Deno.env.get("MEMBRE_JWT_SECRET")!;
 
   if (!SUPABASE_URL || !SERVICE_ROLE || !JWT_SECRET) {
     return badRequest("Configuration serveur incomplète", 500);

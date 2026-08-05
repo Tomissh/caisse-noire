@@ -14,7 +14,14 @@ export function MembreTopbar() {
       </Link>
       <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
         <span className="hidden sm:inline">
-          Session jusqu&apos;à {expiresAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+          Session jusqu&apos;au{" "}
+          {expiresAt.toLocaleString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </span>
         <button
           type="button"

@@ -14,6 +14,11 @@ type CreateUserResult = { ok: true; userId: string; password: string } | { ok: f
 
 const uuid = z.uuid();
 const email = z.email("Email invalide");
+const username = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9._-]{3,32}$/, "3-32 caractères : lettres, chiffres, . _ -");
 
 // ---------------------------------------------------------------------------
 // Super-admins : ajouter / retirer
@@ -72,12 +77,14 @@ export async function removeSuperAdminAction(input: { userId: string }): Promise
 
 const createUserSchema = z.object({
   email,
+  username,
   password: z.string().min(8, "≥ 8 caractères").max(200),
   makeSuperAdmin: z.boolean(),
 });
 
 export async function createAdminUserAction(input: {
   email: string;
+  username: string;
   password: string;
   makeSuperAdmin: boolean;
 }): Promise<CreateUserResult> {
@@ -95,6 +102,15 @@ export async function createAdminUserAction(input: {
   });
   if (error || !data.user) {
     return { ok: false, error: error?.message ?? "Création impossible" };
+  }
+
+  const { error: errProfile } = await admin
+    .from("admin_profiles")
+    .insert({ user_id: data.user.id, username: parsed.data.username });
+  if (errProfile) {
+    const msg =
+      errProfile.code === "23505" ? "Nom d'utilisateur déjà pris" : errProfile.message;
+    return { ok: false, error: `Compte créé mais nom d'utilisateur échoué : ${msg}` };
   }
 
   if (parsed.data.makeSuperAdmin) {
