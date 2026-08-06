@@ -74,6 +74,7 @@ export async function regenerateCodeAction(input: { caisseId: string }): Promise
 const addAdminSchema = z.object({
   caisseId: uuid,
   email: z.email("Email invalide"),
+  membreId: uuid.nullable(),
 });
 
 type AddAdminResult = { ok: true; password?: string } | { ok: false; error: string };
@@ -82,9 +83,12 @@ type AddAdminResult = { ok: true; password?: string } | { ok: false; error: stri
 // email, en crée un à la volée (mot de passe généré, renvoyé une seule fois
 // à l'appelant pour transmission) — évite le détour obligatoire par
 // l'espace super-admin pour un simple créateur qui veut ajouter un co-admin.
+// membreId (optionnel) lie ce compte admin au membre correspondant de la
+// caisse — utile quand l'admin est aussi un joueur de l'équipe.
 export async function addAdminAction(input: {
   caisseId: string;
   email: string;
+  membreId: string | null;
 }): Promise<AddAdminResult> {
   const parsed = addAdminSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Email invalide" };
@@ -120,12 +124,19 @@ export async function addAdminAction(input: {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("admins_caisse")
-    .insert({ caisse_id: parsed.data.caisseId, user_id: target.id });
+  const { error } = await supabase.from("admins_caisse").insert({
+    caisse_id: parsed.data.caisseId,
+    user_id: target.id,
+    membre_id: parsed.data.membreId,
+  });
 
   if (error) {
-    if (error.code === "23505") return { ok: false, error: "Cet utilisateur est déjà admin" };
+    if (error.code === "23505") {
+      if (error.message.includes("membre_id")) {
+        return { ok: false, error: "Ce membre est déjà lié à un autre admin" };
+      }
+      return { ok: false, error: "Cet utilisateur est déjà admin" };
+    }
     return { ok: false, error: error.message };
   }
   revalidatePath(`/admin/caisses/${parsed.data.caisseId}/parametres`);

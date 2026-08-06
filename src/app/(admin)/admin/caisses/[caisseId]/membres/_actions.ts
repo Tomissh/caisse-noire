@@ -3,7 +3,7 @@
 // Server Actions pour la gestion des membres d'une caisse.
 //   - createMembreAction : INSERT + hash bcryptjs cost 12 (cohérent avec
 //     l'Edge Function set-password-membre)
-//   - updateMembreAction : prénom, nom, actif
+//   - updateMembreAction : nom, actif
 //   - resetMembrePasswordAction : remplace le password_hash (admin pose
 //     directement un nouveau mdp, à transmettre au membre)
 //
@@ -27,14 +27,12 @@ type Result = { ok: true } | { ok: false; error: string };
 
 const createMembreSchema = z.object({
   caisseId: uuid,
-  prenom: personName,
   nom: personName,
   password,
 });
 
 export async function createMembreAction(input: {
   caisseId: string;
-  prenom: string;
   nom: string;
   password: string;
 }): Promise<Result> {
@@ -46,14 +44,13 @@ export async function createMembreAction(input: {
 
   const { error } = await supabase.from("membres").insert({
     caisse_id: parsed.data.caisseId,
-    prenom: parsed.data.prenom,
     nom: parsed.data.nom,
     password_hash: hash,
   });
 
   if (error) {
     if (error.code === "23505") {
-      return { ok: false, error: "Un membre avec ce prénom et nom existe déjà dans la caisse" };
+      return { ok: false, error: "Un membre avec ce nom existe déjà dans la caisse" };
     }
     return { ok: false, error: error.message };
   }
@@ -65,7 +62,6 @@ export async function createMembreAction(input: {
 const updateMembreSchema = z.object({
   membreId: uuid,
   caisseId: uuid,
-  prenom: personName,
   nom: personName,
   actif: z.boolean(),
 });
@@ -73,7 +69,6 @@ const updateMembreSchema = z.object({
 export async function updateMembreAction(input: {
   membreId: string;
   caisseId: string;
-  prenom: string;
   nom: string;
   actif: boolean;
 }): Promise<Result> {
@@ -84,7 +79,6 @@ export async function updateMembreAction(input: {
   const { error } = await supabase
     .from("membres")
     .update({
-      prenom: parsed.data.prenom,
       nom: parsed.data.nom,
       actif: parsed.data.actif,
     })
@@ -92,7 +86,7 @@ export async function updateMembreAction(input: {
 
   if (error) {
     if (error.code === "23505") {
-      return { ok: false, error: "Un membre avec ce prénom et nom existe déjà" };
+      return { ok: false, error: "Un membre avec ce nom existe déjà" };
     }
     return { ok: false, error: error.message };
   }

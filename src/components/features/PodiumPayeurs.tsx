@@ -14,7 +14,7 @@ import { Avatar } from "./Avatar";
 
 export type PayeurRow = {
   id: string;
-  prenom: string;
+  nom: string;
   montantCentimes: number;
   avatarUrl?: string | null;
 };
@@ -56,12 +56,12 @@ export function PodiumPayeurs({ rows }: { rows: PayeurRow[] }) {
             <Avatar
               src={r.avatarUrl}
               size={slot.size}
-              alt={r.prenom}
+              alt={r.nom}
               className={`border-4 ${slot.ring}`}
             />
             <div className="flex flex-col items-center text-center">
               <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {slot.medal} {r.prenom}
+                {slot.medal} {r.nom}
               </div>
               <div className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-50">
                 {Math.round(r.montantCentimes / 100)}€

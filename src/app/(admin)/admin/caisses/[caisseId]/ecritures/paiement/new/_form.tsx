@@ -21,9 +21,13 @@ type FormValues = z.infer<typeof schema>;
 export function PaiementForm({
   caisseId,
   membres,
+  onSuccess,
+  onCancel,
 }: {
   caisseId: string;
-  membres: { id: string; prenom: string; nom: string }[];
+  membres: { id: string; nom: string }[];
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -45,7 +49,11 @@ export function PaiementForm({
       return;
     }
     toast.success("Paiement enregistré");
-    router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    }
     router.refresh();
   };
 
@@ -64,7 +72,7 @@ export function PaiementForm({
           <option value="">— Choisir —</option>
           {membres.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.prenom} {m.nom}
+              {m.nom}
             </option>
           ))}
         </select>
@@ -98,7 +106,7 @@ export function PaiementForm({
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => (onCancel ? onCancel() : router.back())}
           className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
           Annuler

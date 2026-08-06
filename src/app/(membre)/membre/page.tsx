@@ -33,7 +33,6 @@ type Situation = {
   total_amendes_centimes: number | null;
   total_paiements_centimes: number | null;
   solde_centimes: number | null;
-  prenom: string;
   nom: string;
   actif: boolean;
 };
@@ -62,7 +61,7 @@ type Retrait = {
 type Data = {
   caisseNom: string;
   caisseCode: string;
-  moi: { prenom: string; nom: string } | null;
+  moi: { nom: string } | null;
   monSolde: number;
   monTotalAmendes: number;
   monTotalPaiements: number;
@@ -117,12 +116,12 @@ export default function MembreDashboardPage() {
               .maybeSingle(),
             supabase
               .from("membres")
-              .select("prenom, nom")
+              .select("nom")
               .eq("id", claims.membre_id)
               .maybeSingle(),
             supabase
               .from("membres")
-              .select("id, prenom, nom, actif")
+              .select("id, nom, actif")
               .eq("caisse_id", claims.caisse_id),
             supabase
               .from("v_membre_situation")
@@ -135,7 +134,7 @@ export default function MembreDashboardPage() {
               .maybeSingle(),
             supabase
               .from("paiements")
-              .select("membre_id, montant_centimes, membres(prenom, nom)")
+              .select("membre_id, montant_centimes, membres(nom)")
               .eq("caisse_id", claims.caisse_id)
               .is("supprimee_at", null)
               .gte("created_at", moisDebut)
@@ -189,7 +188,6 @@ export default function MembreDashboardPage() {
             total_amendes_centimes: s?.total_amendes_centimes ?? 0,
             total_paiements_centimes: s?.total_paiements_centimes ?? 0,
             solde_centimes: s?.solde_centimes ?? 0,
-            prenom: m.prenom,
             nom: m.nom,
             actif: m.actif,
           };
@@ -199,17 +197,17 @@ export default function MembreDashboardPage() {
 
         // Podium du mois en cours : paiements bruts (non décalés), agrégés
         // par membre — même calcul que le dashboard admin.
-        const topPayeursByMembreId = new Map<string, { prenom: string; total: number }>();
+        const topPayeursByMembreId = new Map<string, { nom: string; total: number }>();
         for (const p of paiementsMoisRes.data ?? []) {
           if (!p.membre_id) continue;
-          const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+          const m = (p.membres as unknown as { nom: string } | null) ?? null;
           if (!m) continue;
-          const entry = topPayeursByMembreId.get(p.membre_id) ?? { prenom: m.prenom, total: 0 };
+          const entry = topPayeursByMembreId.get(p.membre_id) ?? { nom: m.nom, total: 0 };
           entry.total += p.montant_centimes;
           topPayeursByMembreId.set(p.membre_id, entry);
         }
         const topPayeursSansPhoto = [...topPayeursByMembreId.entries()]
-          .map(([membreId, v]) => ({ id: membreId, prenom: v.prenom, montantCentimes: v.total }))
+          .map(([membreId, v]) => ({ id: membreId, nom: v.nom, montantCentimes: v.total }))
           .sort((a, b) => b.montantCentimes - a.montantCentimes)
           .slice(0, 3);
 
@@ -278,7 +276,7 @@ export default function MembreDashboardPage() {
       {/* Header --------------------------------------------------------- */}
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Bienvenue{data.moi ? `, ${data.moi.prenom}` : ""}
+          Bienvenue{data.moi ? `, ${data.moi.nom}` : ""}
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Caisse : <span className="font-medium">{data.caisseNom}</span>
@@ -386,7 +384,7 @@ export default function MembreDashboardPage() {
                 }`}
               >
                 <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {s.prenom} {s.nom}
+                  {s.nom}
                 </span>
                 <span
                   className={`font-mono text-sm font-semibold ${

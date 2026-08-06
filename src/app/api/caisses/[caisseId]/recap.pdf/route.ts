@@ -59,7 +59,7 @@ export async function GET(
   const amendesQuery = supabase
     .from("amendes")
     .select(
-      "id, libelle, montant_centimes, declaree_par_user_id, supprimee_at, motif_suppression, created_at, membres(prenom, nom)",
+      "id, libelle, montant_centimes, declaree_par_user_id, supprimee_at, motif_suppression, created_at, membres(nom)",
     )
     .eq("caisse_id", caisseId)
     .order("created_at", { ascending: true });
@@ -67,7 +67,7 @@ export async function GET(
   const paiementsQuery = supabase
     .from("paiements")
     .select(
-      "id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, motif_suppression, created_at, membres(prenom, nom)",
+      "id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, motif_suppression, created_at, membres(nom)",
     )
     .eq("caisse_id", caisseId)
     .order("created_at", { ascending: true });
@@ -94,7 +94,7 @@ export async function GET(
       .select("id", { count: "exact", head: true })
       .eq("caisse_id", caisseId)
       .eq("actif", true),
-    supabase.from("membres").select("id, prenom, nom, actif").eq("caisse_id", caisseId),
+    supabase.from("membres").select("id, nom, actif").eq("caisse_id", caisseId),
     supabase
       .from("v_membre_situation")
       .select("membre_id, total_amendes_centimes, total_paiements_centimes, solde_centimes")
@@ -177,7 +177,6 @@ export async function GET(
   const membres: MembreLigne[] = (membresRes.data ?? []).map((m) => {
     const s = situationByMembreId.get(m.id);
     return {
-      prenom: m.prenom,
       nom: m.nom,
       actif: m.actif,
       totalAmendesCentimes: s?.totalAmendesCentimes ?? 0,
@@ -187,11 +186,11 @@ export async function GET(
   });
 
   const amendes: EcritureLigne[] = amendesRows.map((a) => {
-    const m = (a.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (a.membres as unknown as { nom: string } | null) ?? null;
     return {
       date: a.created_at,
       libelle: a.libelle,
-      membreNom: m ? `${m.prenom} ${m.nom}` : null,
+      membreNom: m ? m.nom : null,
       moyen: null,
       montantCentimes: a.montant_centimes,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? null,
@@ -201,11 +200,11 @@ export async function GET(
   });
 
   const paiements: EcritureLigne[] = paiementsRows.map((p) => {
-    const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (p.membres as unknown as { nom: string } | null) ?? null;
     return {
       date: p.created_at,
-      libelle: m ? `Paiement ${m.prenom} ${m.nom}` : "Paiement",
-      membreNom: m ? `${m.prenom} ${m.nom}` : null,
+      libelle: m ? `Paiement ${m.nom}` : "Paiement",
+      membreNom: m ? m.nom : null,
       moyen: p.moyen,
       montantCentimes: p.montant_centimes,
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? null,

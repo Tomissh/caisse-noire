@@ -36,16 +36,19 @@ export type Database = {
         Row: {
           caisse_id: string
           created_at: string
+          membre_id: string | null
           user_id: string
         }
         Insert: {
           caisse_id: string
           created_at?: string
+          membre_id?: string | null
           user_id: string
         }
         Update: {
           caisse_id?: string
           created_at?: string
+          membre_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -62,6 +65,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_caisse_solde"
             referencedColumns: ["caisse_id"]
+          },
+          {
+            foreignKeyName: "admins_caisse_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
+            referencedRelation: "membres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admins_caisse_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
+            referencedRelation: "v_membre_situation"
+            referencedColumns: ["membre_id"]
           },
         ]
       }
@@ -252,7 +269,6 @@ export type Database = {
           id: string
           nom: string
           password_hash: string | null
-          prenom: string
           updated_at: string
         }
         Insert: {
@@ -262,7 +278,6 @@ export type Database = {
           id?: string
           nom: string
           password_hash?: string | null
-          prenom: string
           updated_at?: string
         }
         Update: {
@@ -272,7 +287,6 @@ export type Database = {
           id?: string
           nom?: string
           password_hash?: string | null
-          prenom?: string
           updated_at?: string
         }
         Relationships: [
@@ -522,7 +536,6 @@ export type Database = {
           montant_a_payer_centimes: number
           nom: string
           paiements_mois_centimes: number
-          prenom: string
           solde_apres_centimes: number
           solde_avant_centimes: number
         }[]

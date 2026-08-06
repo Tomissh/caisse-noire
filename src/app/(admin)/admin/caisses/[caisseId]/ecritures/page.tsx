@@ -9,8 +9,12 @@ import Link from "next/link";
 import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { centimesToEuros } from "@/lib/format";
 import { FilterBar } from "./_components/filter-bar";
 import { EcrituresList, type EcritureItem } from "./_components/list";
+import { NouvelleAmendeDialog } from "./_components/nouvelle-amende-dialog";
+import { NouveauPaiementDialog } from "./_components/nouveau-paiement-dialog";
+import { NouveauRetraitDialog } from "./_components/nouveau-retrait-dialog";
 
 type Tab = "toutes" | "amendes" | "paiements" | "retraits";
 
@@ -57,13 +61,35 @@ export default async function EcrituresPage({
 
   const supabase = await createClient();
 
-  // Membres pour le sélecteur
+  // Membres pour le sélecteur de filtre (tous, actifs et inactifs)
   const { data: membres } = await supabase
     .from("membres")
-    .select("id, prenom, nom")
+    .select("id, nom")
     .eq("caisse_id", caisseId)
-    .order("nom")
-    .order("prenom");
+    .order("nom");
+
+  // Membres actifs + motifs — pour les popups de saisie (amende/paiement)
+  const [membresActifsRes, motifsRes] = await Promise.all([
+    supabase
+      .from("membres")
+      .select("id, nom")
+      .eq("caisse_id", caisseId)
+      .eq("actif", true)
+      .order("nom"),
+    supabase
+      .from("motifs_amende")
+      .select("id, libelle, montant_centimes, montant_variable")
+      .eq("caisse_id", caisseId)
+      .eq("actif", true)
+      .order("libelle"),
+  ]);
+  const membresActifs = membresActifsRes.data ?? [];
+  const motifsAmende = (motifsRes.data ?? []).map((m) => ({
+    id: m.id,
+    libelle: m.libelle,
+    montantEuros: centimesToEuros(m.montant_centimes),
+    montantVariable: m.montant_variable,
+  }));
 
   const fromIso = from ? `${from}T00:00:00Z` : null;
   const toIso = to ? `${to}T23:59:59Z` : null;
@@ -78,7 +104,7 @@ export default async function EcrituresPage({
         let q = supabase
           .from("amendes")
           .select(
-            "id, caisse_id, membre_id, motif_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, prenom, nom)",
+            "id, caisse_id, membre_id, motif_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, nom)",
           )
           .eq("caisse_id", caisseId)
           .order("created_at", { ascending: false })
@@ -96,7 +122,7 @@ export default async function EcrituresPage({
         let q = supabase
           .from("paiements")
           .select(
-            "id, caisse_id, membre_id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, prenom, nom)",
+            "id, caisse_id, membre_id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, nom)",
           )
           .eq("caisse_id", caisseId)
           .order("created_at", { ascending: false })
@@ -159,7 +185,7 @@ export default async function EcrituresPage({
   const items: EcritureItem[] = [];
 
   for (const a of amendesRes.data ?? []) {
-    const m = (a.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (a.membres as unknown as { nom: string } | null) ?? null;
     items.push({
       type: "amende",
       id: a.id,
@@ -167,7 +193,7 @@ export default async function EcrituresPage({
       createdAt: a.created_at,
       montantCentimes: a.montant_centimes,
       libelle: a.libelle,
-      membreNom: m ? `${m.prenom} ${m.nom}` : "(membre supprimé)",
+      membreNom: m ? m.nom : "(membre supprimé)",
       moyen: null,
       jourMatch: a.jour_match,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? a.declaree_par_user_id.slice(0, 8),
@@ -179,15 +205,15 @@ export default async function EcrituresPage({
     });
   }
   for (const p of paiementsRes.data ?? []) {
-    const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (p.membres as unknown as { nom: string } | null) ?? null;
     items.push({
       type: "paiement",
       id: p.id,
       caisseId: p.caisse_id,
       createdAt: p.created_at,
       montantCentimes: p.montant_centimes,
-      libelle: m ? `Paiement ${m.prenom} ${m.nom}` : "Paiement",
-      membreNom: m ? `${m.prenom} ${m.nom}` : "(membre supprimé)",
+      libelle: m ? `Paiement ${m.nom}` : "Paiement",
+      membreNom: m ? m.nom : "(membre supprimé)",
       moyen: p.moyen,
       jourMatch: false,
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? p.enregistre_par_user_id.slice(0, 8),
@@ -242,24 +268,21 @@ export default async function EcrituresPage({
           </h1>
           {!cloturee && (
             <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/admin/caisses/${caisseId}/ecritures/amende/new`}
-                className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
-                + Amende
-              </Link>
-              <Link
-                href={`/admin/caisses/${caisseId}/ecritures/paiement/new`}
-                className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-              >
-                + Paiement
-              </Link>
-              <Link
-                href={`/admin/caisses/${caisseId}/ecritures/retrait/new`}
-                className="rounded-md bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700"
-              >
-                + Retrait
-              </Link>
+              <NouvelleAmendeDialog
+                caisseId={caisseId}
+                motifs={motifsAmende}
+                membres={membresActifs}
+                triggerClassName="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+              />
+              <NouveauPaiementDialog
+                caisseId={caisseId}
+                membres={membresActifs}
+                triggerClassName="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+              />
+              <NouveauRetraitDialog
+                caisseId={caisseId}
+                triggerClassName="rounded-md bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700"
+              />
             </div>
           )}
         </header>

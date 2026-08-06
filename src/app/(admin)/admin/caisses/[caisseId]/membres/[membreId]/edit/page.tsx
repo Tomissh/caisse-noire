@@ -1,4 +1,4 @@
-// Édition d'un membre : prénom, nom, actif/désactivé + reset password.
+// Édition d'un membre : nom, actif/désactivé + reset password.
 // Le mdp actuel n'est jamais affiché (seul son hash est stocké) ; pour le
 // changer l'admin saisit un nouveau mdp (ou en génère un).
 
@@ -19,7 +19,7 @@ export default async function EditMembrePage({
   const supabase = await createClient();
   const { data: membre } = await supabase
     .from("membres")
-    .select("id, prenom, nom, actif")
+    .select("id, nom, actif")
     .eq("id", membreId)
     .eq("caisse_id", caisseId)
     .maybeSingle();
@@ -36,7 +36,7 @@ export default async function EditMembrePage({
             ← Membres
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {membre.prenom} {membre.nom}
+            {membre.nom}
           </h1>
         </header>
         <EditMembreForm caisseId={caisseId} membre={membre} />

@@ -13,16 +13,23 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addAdminAction, removeAdminAction } from "./_actions";
 
-const schema = z.object({ email: z.email("Email invalide") });
+const NONE = "__none__" as const;
+
+const schema = z.object({
+  email: z.email("Email invalide"),
+  membreId: z.string(), // membreId ou NONE
+});
 type FormValues = z.infer<typeof schema>;
 
 export function AdminsBlock({
   caisseId,
   admins,
+  membresDisponibles,
   canManage,
 }: {
   caisseId: string;
-  admins: { userId: string; email: string }[];
+  admins: { userId: string; email: string; membreNom: string | null }[];
+  membresDisponibles: { id: string; nom: string }[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -36,13 +43,17 @@ export function AdminsBlock({
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "" },
+    defaultValues: { email: "", membreId: NONE },
   });
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     setCreated(null);
-    const res = await addAdminAction({ caisseId, email: values.email });
+    const res = await addAdminAction({
+      caisseId,
+      email: values.email,
+      membreId: values.membreId === NONE ? null : values.membreId,
+    });
     if (!res.ok) {
       setServerError(res.error);
       toast.error(res.error);
@@ -54,7 +65,7 @@ export function AdminsBlock({
     } else {
       toast.success("Admin ajouté");
     }
-    reset({ email: "" });
+    reset({ email: "", membreId: NONE });
     router.refresh();
   };
 
@@ -117,7 +128,14 @@ export function AdminsBlock({
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {admins.map((a) => (
             <li key={a.userId} className="flex items-center justify-between py-2 text-sm">
-              <span className="text-zinc-700 dark:text-zinc-300">{a.email}</span>
+              <span className="text-zinc-700 dark:text-zinc-300">
+                {a.email}
+                {a.membreNom && (
+                  <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    {a.membreNom}
+                  </span>
+                )}
+              </span>
               {canManage && (
                 <button
                   type="button"
@@ -157,6 +175,22 @@ export function AdminsBlock({
           {errors.email && (
             <p className="text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>
           )}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              Lier à un membre de la caisse (optionnel)
+            </label>
+            <select
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+              {...register("membreId")}
+            >
+              <option value={NONE}>— Aucun —</option>
+              {membresDisponibles.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nom}
+                </option>
+              ))}
+            </select>
+          </div>
           {serverError && (
             <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
               {serverError}

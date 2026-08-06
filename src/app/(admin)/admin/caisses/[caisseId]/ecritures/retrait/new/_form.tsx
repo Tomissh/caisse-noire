@@ -18,7 +18,15 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-export function RetraitForm({ caisseId }: { caisseId: string }) {
+export function RetraitForm({
+  caisseId,
+  onSuccess,
+  onCancel,
+}: {
+  caisseId: string;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
@@ -39,7 +47,11 @@ export function RetraitForm({ caisseId }: { caisseId: string }) {
       return;
     }
     toast.success("Retrait enregistré");
-    router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    }
     router.refresh();
   };
 
@@ -89,7 +101,7 @@ export function RetraitForm({ caisseId }: { caisseId: string }) {
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => (onCancel ? onCancel() : router.back())}
           className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
           Annuler

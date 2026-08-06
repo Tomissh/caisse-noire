@@ -111,14 +111,14 @@ export default async function AuditPage({
   }
 
   // Membres pour rendu humain
-  const membresById = new Map<string, { prenom: string; nom: string }>();
+  const membresById = new Map<string, { nom: string }>();
   if (membreIds.size > 0) {
     const { data: ms } = await supabase
       .from("membres")
-      .select("id, prenom, nom")
+      .select("id, nom")
       .in("id", Array.from(membreIds));
     for (const m of ms ?? []) {
-      membresById.set(m.id, { prenom: m.prenom, nom: m.nom });
+      membresById.set(m.id, { nom: m.nom });
     }
   }
 
@@ -126,7 +126,7 @@ export default async function AuditPage({
     if (!acteurFilter) return true;
     const email = r.acteur_user_id ? emailsById.get(r.acteur_user_id) ?? "" : "";
     const membre = r.acteur_membre_id ? membresById.get(r.acteur_membre_id) : null;
-    const membreNom = membre ? `${membre.prenom} ${membre.nom}` : "";
+    const membreNom = membre ? membre.nom : "";
     const haystack = `${email} ${membreNom}`.toLowerCase();
     return haystack.includes(acteurFilter.toLowerCase());
   });
@@ -187,8 +187,7 @@ export default async function AuditPage({
                 ? membresById.get(r.acteur_membre_id)
                 : null;
               const acteurStr =
-                acteurEmail ??
-                (acteurMembre ? `${acteurMembre.prenom} ${acteurMembre.nom} (membre)` : "—");
+                acteurEmail ?? (acteurMembre ? `${acteurMembre.nom} (membre)` : "—");
 
               return (
                 <li key={r.id} className="px-4 py-3 text-sm">

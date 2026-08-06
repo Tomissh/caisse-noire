@@ -29,8 +29,26 @@ export default async function ParametresPage({
   // Liste des admins additionnels (hors créateur).
   const { data: adminsRows } = await supabase
     .from("admins_caisse")
-    .select("user_id, created_at")
+    .select("user_id, created_at, membre_id")
     .eq("caisse_id", caisseId);
+
+  // Membres actifs de la caisse — pour le lien admin ↔ membre.
+  const { data: membresRows } = await supabase
+    .from("membres")
+    .select("id, nom")
+    .eq("caisse_id", caisseId)
+    .eq("actif", true)
+    .order("nom");
+  const membreNameById = new Map<string, string>();
+  for (const m of membresRows ?? []) {
+    membreNameById.set(m.id, m.nom);
+  }
+  const membreIdsDejaLies = new Set(
+    (adminsRows ?? []).map((r) => r.membre_id).filter((id): id is string => id !== null),
+  );
+  const membresDisponibles = (membresRows ?? [])
+    .filter((m) => !membreIdsDejaLies.has(m.id))
+    .map((m) => ({ id: m.id, nom: m.nom }));
 
   // Résoudre les emails via service-role (pas de FK exposée vers auth.users).
   const adminClient = createAdminClient();
@@ -43,6 +61,7 @@ export default async function ParametresPage({
   const adminsList = (adminsRows ?? []).map((r) => ({
     userId: r.user_id,
     email: emailByUserId.get(r.user_id) ?? "(email inconnu)",
+    membreNom: r.membre_id ? (membreNameById.get(r.membre_id) ?? null) : null,
   }));
 
   const canManageAdmins = role === "createur" || role === "super_admin";
@@ -71,6 +90,7 @@ export default async function ParametresPage({
         <AdminsBlock
           caisseId={caisseId}
           admins={adminsList}
+          membresDisponibles={membresDisponibles}
           canManage={canManageAdmins}
         />
 

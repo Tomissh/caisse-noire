@@ -29,12 +29,12 @@ function libelle(p: Payload): string | null {
 
 function membreNomFromMap(
   p: Payload,
-  membresById: Map<string, { prenom: string; nom: string }>,
+  membresById: Map<string, { nom: string }>,
 ): string | null {
   const v = p["membre_id"];
   if (typeof v !== "string") return null;
   const m = membresById.get(v);
-  return m ? `${m.prenom} ${m.nom}` : null;
+  return m ? m.nom : null;
 }
 
 function diffToString(p: Payload): string {
@@ -59,7 +59,7 @@ function diffToString(p: Payload): string {
 export function formatAuditAction(
   action: string,
   payload: Payload,
-  membresById: Map<string, { prenom: string; nom: string }>,
+  membresById: Map<string, { nom: string }>,
   emailsById: Map<string, string>,
 ): FormattedAudit {
   switch (action) {
@@ -128,18 +128,16 @@ export function formatAuditAction(
     case "caisse.delete":
       return { kind: "text", label: "Caisse supprimée" };
     case "membre.create": {
-      const p = typeof payload["prenom"] === "string" ? payload["prenom"] : "";
       const n = typeof payload["nom"] === "string" ? payload["nom"] : "";
-      return { kind: "text", label: "Membre ajouté", detail: `${p} ${n}`.trim() };
+      return { kind: "text", label: "Membre ajouté", detail: n };
     }
     case "membre.update":
       return { kind: "text", label: "Membre modifié", detail: diffToString(payload) };
     case "membre.set_password":
       return { kind: "text", label: "Mot de passe membre modifié" };
     case "membre.delete": {
-      const p = typeof payload["prenom"] === "string" ? payload["prenom"] : "";
       const n = typeof payload["nom"] === "string" ? payload["nom"] : "";
-      return { kind: "text", label: "Membre supprimé", detail: `${p} ${n}`.trim() };
+      return { kind: "text", label: "Membre supprimé", detail: n };
     }
     case "motif.create": {
       const lib = libelle(payload);

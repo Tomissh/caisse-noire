@@ -1,6 +1,6 @@
 // Edge Function : login-membre
 //
-// Vérifie (code_caisse, prenom, nom, mot_de_passe) → renvoie un JWT custom
+// Vérifie (code_caisse, nom, mot_de_passe) → renvoie un JWT custom
 // signé avec le SUPABASE_JWT_SECRET portant les claims :
 //   { aud: 'authenticated', role: 'authenticated', sub: <membre_id>,
 //     app_role: 'membre', caisse_id, membre_id, exp }
@@ -18,7 +18,6 @@ const SESSION_DURATION_SECONDS = 30 * 24 * 60 * 60; // 30 j
 
 interface LoginPayload {
   code_caisse: string;
-  prenom: string;
   nom: string;
   mot_de_passe: string;
 }
@@ -56,12 +55,11 @@ Deno.serve(async (req) => {
   }
 
   const code = payload.code_caisse?.trim().toUpperCase();
-  const prenom = payload.prenom?.trim();
   const nom = payload.nom?.trim();
   const mdp = payload.mot_de_passe;
 
-  if (!code || !prenom || !nom || !mdp) {
-    return badRequest("Champs requis : code_caisse, prenom, nom, mot_de_passe");
+  if (!code || !nom || !mdp) {
+    return badRequest("Champs requis : code_caisse, nom, mot_de_passe");
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -90,7 +88,6 @@ Deno.serve(async (req) => {
     .from("membres")
     .select("id, password_hash, actif")
     .eq("caisse_id", caisse.id)
-    .ilike("prenom", prenom)
     .ilike("nom", nom)
     .maybeSingle();
 

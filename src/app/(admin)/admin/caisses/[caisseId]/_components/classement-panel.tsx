@@ -9,7 +9,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export type ClassementRow = {
-  prenom: string;
   nom: string;
   montantAPayerCentimes: number;
 };
@@ -19,7 +18,7 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 function formatLine(row: ClassementRow, index: number): string {
   const euros = Math.round(row.montantAPayerCentimes / 100);
   const medal = MEDALS[index] ?? "";
-  return `${medal}${row.prenom} ${euros}€`;
+  return `${medal}${row.nom} ${euros}€`;
 }
 
 export function ClassementPanel({ rows }: { rows: ClassementRow[] }) {
@@ -53,7 +52,7 @@ export function ClassementPanel({ rows }: { rows: ClassementRow[] }) {
             <>
               <ol className="space-y-1 font-mono text-sm text-zinc-900 dark:text-zinc-50">
                 {rows.map((r, i) => (
-                  <li key={`${r.prenom}-${r.nom}-${i}`}>{formatLine(r, i)}</li>
+                  <li key={`${r.nom}-${i}`}>{formatLine(r, i)}</li>
                 ))}
               </ol>
               <button

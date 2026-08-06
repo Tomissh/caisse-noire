@@ -29,11 +29,10 @@ export default async function NewAmendePage({
       .order("libelle"),
     supabase
       .from("membres")
-      .select("id, prenom, nom")
+      .select("id, nom")
       .eq("caisse_id", caisseId)
       .eq("actif", true)
-      .order("nom")
-      .order("prenom"),
+      .order("nom"),
   ]);
 
   const motifs = (motifsRes.data ?? []).map((m) => ({

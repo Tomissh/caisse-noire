@@ -10,7 +10,6 @@ import { updateMembreAction, resetMembrePasswordAction } from "../../_actions";
 import { generatePassword } from "@/lib/caisse-code";
 
 const infoSchema = z.object({
-  prenom: z.string().trim().min(1, "Requis").max(60),
   nom: z.string().trim().min(1, "Requis").max(60),
   actif: z.boolean(),
 });
@@ -26,7 +25,7 @@ export function EditMembreForm({
   membre,
 }: {
   caisseId: string;
-  membre: { id: string; prenom: string; nom: string; actif: boolean };
+  membre: { id: string; nom: string; actif: boolean };
 }) {
   const router = useRouter();
 
@@ -34,7 +33,7 @@ export function EditMembreForm({
   const [infoError, setInfoError] = useState<string | null>(null);
   const infoForm = useForm<InfoValues>({
     resolver: zodResolver(infoSchema),
-    defaultValues: { prenom: membre.prenom, nom: membre.nom, actif: membre.actif },
+    defaultValues: { nom: membre.nom, actif: membre.actif },
   });
 
   const onSubmitInfo = async (values: InfoValues) => {
@@ -89,31 +88,17 @@ export function EditMembreForm({
         noValidate
       >
         <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Informations</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Prénom</label>
-            <input
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-              {...infoForm.register("prenom")}
-            />
-            {infoForm.formState.errors.prenom && (
-              <p className="text-xs text-red-600 dark:text-red-400">
-                {infoForm.formState.errors.prenom.message}
-              </p>
-            )}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Nom</label>
-            <input
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-              {...infoForm.register("nom")}
-            />
-            {infoForm.formState.errors.nom && (
-              <p className="text-xs text-red-600 dark:text-red-400">
-                {infoForm.formState.errors.nom.message}
-              </p>
-            )}
-          </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Nom</label>
+          <input
+            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+            {...infoForm.register("nom")}
+          />
+          {infoForm.formState.errors.nom && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              {infoForm.formState.errors.nom.message}
+            </p>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">

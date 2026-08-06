@@ -14,7 +14,6 @@ import { formatEuros, formatSolde } from "@/lib/format";
 // ---------------------------------------------------------------------------
 
 export type MembreLigne = {
-  prenom: string;
   nom: string;
   actif: boolean;
   totalAmendesCentimes: number;
@@ -263,9 +262,9 @@ function MembresTable({ rows }: { rows: MembreLigne[] }) {
         <Text style={[styles.th, { flex: 2, textAlign: "right" }]}>Solde</Text>
       </View>
       {sorted.map((m, i) => (
-        <View key={`${m.prenom}-${m.nom}-${i}`} style={i % 2 === 0 ? styles.tr : styles.trZebra}>
+        <View key={`${m.nom}-${i}`} style={i % 2 === 0 ? styles.tr : styles.trZebra}>
           <Text style={[styles.td, { flex: 3 }]}>
-            {m.prenom} {m.nom}
+            {m.nom}
             {!m.actif ? " (désactivé)" : ""}
           </Text>
           <Text style={[styles.td, styles.tdRight, { flex: 2 }]}>

@@ -16,7 +16,7 @@ export function FilterBar({
   includeDeleted,
 }: {
   tab: string;
-  membres: { id: string; prenom: string; nom: string }[];
+  membres: { id: string; nom: string }[];
   membreId: string | null;
   from: string | null;
   to: string | null;
@@ -62,7 +62,7 @@ export function FilterBar({
           <option value="">Tous</option>
           {membres.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.prenom} {m.nom}
+              {m.nom}
             </option>
           ))}
         </select>

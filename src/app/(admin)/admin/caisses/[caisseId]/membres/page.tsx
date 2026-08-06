@@ -16,11 +16,10 @@ export default async function MembresPage({
   const supabase = await createClient();
   const { data: membres } = await supabase
     .from("membres")
-    .select("id, prenom, nom, actif, created_at")
+    .select("id, nom, actif, created_at")
     .eq("caisse_id", caisseId)
     .order("actif", { ascending: false })
-    .order("nom")
-    .order("prenom");
+    .order("nom");
 
   const list = membres ?? [];
 
@@ -57,7 +56,7 @@ export default async function MembresPage({
               >
                 <div className="flex items-center gap-3">
                   <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {m.prenom} {m.nom}
+                    {m.nom}
                   </span>
                   {!m.actif && (
                     <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">

@@ -85,20 +85,20 @@ export default async function GlobalAuditPage({
     }
   }
 
-  const membresById = new Map<string, { prenom: string; nom: string }>();
+  const membresById = new Map<string, { nom: string }>();
   if (membreIds.size > 0) {
     const { data: ms } = await supabase
       .from("membres")
-      .select("id, prenom, nom")
+      .select("id, nom")
       .in("id", Array.from(membreIds));
-    for (const m of ms ?? []) membresById.set(m.id, { prenom: m.prenom, nom: m.nom });
+    for (const m of ms ?? []) membresById.set(m.id, { nom: m.nom });
   }
 
   const filteredRows = (rows ?? []).filter((r) => {
     if (!acteur) return true;
     const email = r.acteur_user_id ? emailsById.get(r.acteur_user_id) ?? "" : "";
     const membre = r.acteur_membre_id ? membresById.get(r.acteur_membre_id) : null;
-    const membreNom = membre ? `${membre.prenom} ${membre.nom}` : "";
+    const membreNom = membre ? membre.nom : "";
     return `${email} ${membreNom}`.toLowerCase().includes(acteur.toLowerCase());
   });
 
@@ -140,7 +140,7 @@ export default async function GlobalAuditPage({
               const acteurStr = r.acteur_user_id
                 ? emailsById.get(r.acteur_user_id) ?? r.acteur_user_id.slice(0, 8)
                 : r.acteur_membre_id
-                  ? `${membresById.get(r.acteur_membre_id)?.prenom ?? "?"} ${membresById.get(r.acteur_membre_id)?.nom ?? ""} (membre)`
+                  ? `${membresById.get(r.acteur_membre_id)?.nom ?? "?"} (membre)`
                   : "—";
               const caisseNom = r.caisse_id ? caisseNomById.get(r.caisse_id) ?? "—" : "—";
 

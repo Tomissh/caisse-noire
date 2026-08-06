@@ -28,12 +28,15 @@ import Link from "next/link";
 import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatEuros, formatSolde } from "@/lib/format";
+import { centimesToEuros, formatEuros, formatSolde } from "@/lib/format";
 import type { EcritureItem } from "./ecritures/_components/list";
 import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
 import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
+import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-dialog";
+import { NouveauPaiementDialog } from "./ecritures/_components/nouveau-paiement-dialog";
+import { NouveauRetraitDialog } from "./ecritures/_components/nouveau-retrait-dialog";
 
 function currentMonthDefault(): string {
   const now = new Date();
@@ -80,6 +83,7 @@ export default async function CaisseDashboardPage({
     paiementsSumRes,
     retraitsSumRes,
     membresRes,
+    motifsRes,
     situationsRes,
     recapMoisRes,
     topPayeursRes,
@@ -94,7 +98,13 @@ export default async function CaisseDashboardPage({
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null),
     supabase.from("retraits").select("montant_centimes").eq("caisse_id", caisseId),
-    supabase.from("membres").select("id, prenom, nom, actif").eq("caisse_id", caisseId),
+    supabase.from("membres").select("id, nom, actif").eq("caisse_id", caisseId),
+    supabase
+      .from("motifs_amende")
+      .select("id, libelle, montant_centimes, montant_variable")
+      .eq("caisse_id", caisseId)
+      .eq("actif", true)
+      .order("libelle"),
     supabase
       .from("v_membre_situation")
       .select("membre_id, solde_centimes")
@@ -102,7 +112,7 @@ export default async function CaisseDashboardPage({
     supabase.rpc("situation_caisse_mois", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
     supabase
       .from("paiements")
-      .select("membre_id, montant_centimes, membres(prenom, nom)")
+      .select("membre_id, montant_centimes, membres(nom)")
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null)
       .gte("created_at", moisEnCoursDebut)
@@ -110,7 +120,7 @@ export default async function CaisseDashboardPage({
     supabase
       .from("amendes")
       .select(
-        "id, caisse_id, membre_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(prenom, nom)",
+        "id, caisse_id, membre_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(nom)",
       )
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null)
@@ -119,7 +129,7 @@ export default async function CaisseDashboardPage({
     supabase
       .from("paiements")
       .select(
-        "id, caisse_id, membre_id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(prenom, nom)",
+        "id, caisse_id, membre_id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(nom)",
       )
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null)
@@ -143,20 +153,31 @@ export default async function CaisseDashboardPage({
   );
   const soldePhysique = soldeRes.data?.solde_centimes ?? totalPaiements - totalRetraits;
 
+  // Données pour les popups de saisie (amende/paiement) — actions rapides.
+  const membresActifs = (membresRes.data ?? [])
+    .filter((m) => m.actif)
+    .map((m) => ({ id: m.id, nom: m.nom }));
+  const motifsAmende = (motifsRes.data ?? []).map((m) => ({
+    id: m.id,
+    libelle: m.libelle,
+    montantEuros: centimesToEuros(m.montant_centimes),
+    montantVariable: m.montant_variable,
+  }));
+
   // Podium des plus gros payeurs du mois calendaire en cours (paiements
   // agrégés par membre, dates brutes — indépendant du mois navigué dans le
   // récapitulatif ci-dessous et du décalage de 7 j de situation_caisse_mois).
-  const topPayeursByMembreId = new Map<string, { prenom: string; total: number }>();
+  const topPayeursByMembreId = new Map<string, { nom: string; total: number }>();
   for (const p of topPayeursRes.data ?? []) {
     if (!p.membre_id) continue;
-    const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (p.membres as unknown as { nom: string } | null) ?? null;
     if (!m) continue;
-    const entry = topPayeursByMembreId.get(p.membre_id) ?? { prenom: m.prenom, total: 0 };
+    const entry = topPayeursByMembreId.get(p.membre_id) ?? { nom: m.nom, total: 0 };
     entry.total += p.montant_centimes;
     topPayeursByMembreId.set(p.membre_id, entry);
   }
   const topPayeursSansPhoto = [...topPayeursByMembreId.entries()]
-    .map(([membreId, v]) => ({ id: membreId, prenom: v.prenom, montantCentimes: v.total }))
+    .map(([membreId, v]) => ({ id: membreId, nom: v.nom, montantCentimes: v.total }))
     .sort((a, b) => b.montantCentimes - a.montantCentimes)
     .slice(0, 3);
 
@@ -183,7 +204,6 @@ export default async function CaisseDashboardPage({
   const soldesParMembre = (membresRes.data ?? [])
     .map((m) => ({
       membreId: m.id,
-      prenom: m.prenom,
       nom: m.nom,
       actif: m.actif,
       solde: soldeByMembreId.get(m.id) ?? 0,
@@ -195,7 +215,7 @@ export default async function CaisseDashboardPage({
     if (b.montant_a_payer_centimes !== a.montant_a_payer_centimes) {
       return b.montant_a_payer_centimes - a.montant_a_payer_centimes;
     }
-    return a.prenom.localeCompare(b.prenom);
+    return a.nom.localeCompare(b.nom);
   });
   const totalAPayer = recapRows.reduce((s, r) => s + r.montant_a_payer_centimes, 0);
 
@@ -221,7 +241,7 @@ export default async function CaisseDashboardPage({
 
   const items: EcritureItem[] = [];
   for (const a of amendesLastRes.data ?? []) {
-    const m = (a.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (a.membres as unknown as { nom: string } | null) ?? null;
     items.push({
       type: "amende",
       id: a.id,
@@ -229,7 +249,7 @@ export default async function CaisseDashboardPage({
       createdAt: a.created_at,
       montantCentimes: a.montant_centimes,
       libelle: a.libelle,
-      membreNom: m ? `${m.prenom} ${m.nom}` : null,
+      membreNom: m ? m.nom : null,
       moyen: null,
       jourMatch: a.jour_match,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? a.declaree_par_user_id.slice(0, 8),
@@ -239,15 +259,15 @@ export default async function CaisseDashboardPage({
     });
   }
   for (const p of paiementsLastRes.data ?? []) {
-    const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    const m = (p.membres as unknown as { nom: string } | null) ?? null;
     items.push({
       type: "paiement",
       id: p.id,
       caisseId: p.caisse_id,
       createdAt: p.created_at,
       montantCentimes: p.montant_centimes,
-      libelle: m ? `Paiement ${m.prenom} ${m.nom}` : "Paiement",
-      membreNom: m ? `${m.prenom} ${m.nom}` : null,
+      libelle: m ? `Paiement ${m.nom}` : "Paiement",
+      membreNom: m ? m.nom : null,
       moyen: p.moyen,
       jourMatch: false,
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? p.enregistre_par_user_id.slice(0, 8),
@@ -290,24 +310,9 @@ export default async function CaisseDashboardPage({
           </div>
           {/* Actions rapides ------------------------------------------- */}
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/admin/caisses/${caisseId}/ecritures/amende/new`}
-              className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-            >
-              + Amende
-            </Link>
-            <Link
-              href={`/admin/caisses/${caisseId}/ecritures/paiement/new`}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              + Paiement
-            </Link>
-            <Link
-              href={`/admin/caisses/${caisseId}/ecritures/retrait/new`}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              + Retrait
-            </Link>
+            <NouvelleAmendeDialog caisseId={caisseId} motifs={motifsAmende} membres={membresActifs} />
+            <NouveauPaiementDialog caisseId={caisseId} membres={membresActifs} />
+            <NouveauRetraitDialog caisseId={caisseId} />
           </div>
         </header>
 
@@ -335,6 +340,57 @@ export default async function CaisseDashboardPage({
           )}
         </section>
 
+        {/* Dettes ------------------------------------------------------- */}
+        <section className="space-y-3">
+          <header className="flex items-center justify-between">
+            <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+              Dettes 💸
+            </h2>
+            <Link
+              href={`/admin/caisses/${caisseId}/membres`}
+              className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              Gérer les membres →
+            </Link>
+          </header>
+          {soldesParMembre.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+              Aucun membre. <Link href={`/admin/caisses/${caisseId}/membres/new`} className="underline">Ajouter le premier</Link>.
+            </p>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {soldesParMembre.map((m) => (
+                <li
+                  key={m.membreId}
+                  className={`flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900 ${
+                    m.actif ? "" : "opacity-60"
+                  }`}
+                >
+                  <div>
+                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      {m.nom}
+                    </div>
+                    {!m.actif && (
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">désactivé</div>
+                    )}
+                  </div>
+                  <span
+                    className={`font-mono text-sm font-semibold ${
+                      m.solde > 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : m.solde < 0
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-zinc-500"
+                    }`}
+                  >
+                    {formatSolde(m.solde)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         {/* Récapitulatif mensuel ----------------------------------------- */}
         <section className="space-y-3">
           <header className="flex flex-wrap items-center justify-between gap-3">
@@ -351,7 +407,6 @@ export default async function CaisseDashboardPage({
 
           <ClassementPanel
             rows={recapRows.map((r) => ({
-              prenom: r.prenom,
               nom: r.nom,
               montantAPayerCentimes: r.montant_a_payer_centimes,
             }))}
@@ -381,7 +436,7 @@ export default async function CaisseDashboardPage({
                       }`}
                     >
                       <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-50">
-                        {r.prenom} {r.nom}
+                        {r.nom}
                         {!r.actif && (
                           <span className="ml-1.5 text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
                             (désactivé)
@@ -425,57 +480,6 @@ export default async function CaisseDashboardPage({
                 )}
               </table>
             </div>
-          )}
-        </section>
-
-        {/* Soldes par membre ------------------------------------------- */}
-        <section className="space-y-3">
-          <header className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-              Dettes 💸
-            </h2>
-            <Link
-              href={`/admin/caisses/${caisseId}/membres`}
-              className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              Gérer les membres →
-            </Link>
-          </header>
-          {soldesParMembre.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-              Aucun membre. <Link href={`/admin/caisses/${caisseId}/membres/new`} className="underline">Ajouter le premier</Link>.
-            </p>
-          ) : (
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {soldesParMembre.map((m) => (
-                <li
-                  key={m.membreId}
-                  className={`flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900 ${
-                    m.actif ? "" : "opacity-60"
-                  }`}
-                >
-                  <div>
-                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      {m.prenom} {m.nom}
-                    </div>
-                    {!m.actif && (
-                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">désactivé</div>
-                    )}
-                  </div>
-                  <span
-                    className={`font-mono text-sm font-semibold ${
-                      m.solde > 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : m.solde < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-zinc-500"
-                    }`}
-                  >
-                    {formatSolde(m.solde)}
-                  </span>
-                </li>
-              ))}
-            </ul>
           )}
         </section>
 

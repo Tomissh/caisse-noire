@@ -18,11 +18,10 @@ export default async function NewPaiementPage({
   const supabase = await createClient();
   const { data: membres } = await supabase
     .from("membres")
-    .select("id, prenom, nom")
+    .select("id, nom")
     .eq("caisse_id", caisseId)
     .eq("actif", true)
-    .order("nom")
-    .order("prenom");
+    .order("nom");
 
   return (
     <main className="flex-1 px-6 py-8">

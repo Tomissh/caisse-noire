@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatAuditAction } from "./_format";
 
 const membresById = new Map([
-  ["m1", { prenom: "Alice", nom: "Martin" }],
+  ["m1", { nom: "Alice Martin" }],
 ]);
 const emailsById = new Map([["u1", "alice@example.com"]]);
 

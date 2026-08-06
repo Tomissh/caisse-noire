@@ -38,7 +38,7 @@ type MotifOption = {
   montantVariable: boolean;
 };
 
-type MembreOption = { id: string; prenom: string; nom: string };
+type MembreOption = { id: string; nom: string };
 
 const rowSchema = z.object({
   membreId: z.string().min(1, "Sélectionnez un membre"),
@@ -61,10 +61,14 @@ export function AmendeForm({
   caisseId,
   motifs,
   membres,
+  onSuccess,
+  onCancel,
 }: {
   caisseId: string;
   motifs: MotifOption[];
   membres: MembreOption[];
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
 
@@ -97,7 +101,11 @@ export function AmendeForm({
     }
     const n = res.count ?? rows.length;
     toast.success(n > 1 ? `${n} amendes déclarées` : "Amende déclarée");
-    router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    }
     router.refresh();
   };
 
@@ -131,7 +139,7 @@ export function AmendeForm({
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => (onCancel ? onCancel() : router.back())}
           className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
           Annuler
@@ -229,7 +237,7 @@ function AmendeRowFields({
           <option value="">— Choisir —</option>
           {membres.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.prenom} {m.nom}
+              {m.nom}
             </option>
           ))}
         </select>
