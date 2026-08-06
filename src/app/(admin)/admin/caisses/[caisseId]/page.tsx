@@ -11,7 +11,9 @@
 //
 // Récapitulatif mensuel : ce que chaque membre doit encore payer pour un
 // mois donné, en tenant compte de son solde reporté (avance/retard) —
-// RPC situation_caisse_mois, navigable par mois via ?mois=YYYY-MM.
+// RPC situation_caisse_mois, navigable par mois via ?mois=YYYY-MM. Un
+// paiement est rattaché au mois des amendes qu'il solde (décalage de 7 j),
+// pas au mois où il a été enregistré. Classement copiable pour relance.
 //
 // Soldes par membre : liste de cards triée par solde décroissant
 // (créditeurs en haut, dettes en bas). Requête en deux temps (membres +
@@ -28,6 +30,7 @@ import { formatEuros, formatSolde } from "@/lib/format";
 import type { EcritureItem } from "./ecritures/_components/list";
 import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
+import { ClassementPanel } from "./_components/classement-panel";
 
 function currentMonthDefault(): string {
   const now = new Date();
@@ -285,14 +288,16 @@ export default async function CaisseDashboardPage({
             </div>
             <div className="flex items-center gap-2">
               <MonthNav mois={mois} caisseId={caisseId} />
-              <a
-                href={`/api/caisses/${caisseId}/recap-mensuel.pdf?mois=${mois}`}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Export PDF
-              </a>
             </div>
           </header>
+
+          <ClassementPanel
+            rows={recapRows.map((r) => ({
+              prenom: r.prenom,
+              nom: r.nom,
+              montantAPayerCentimes: r.montant_a_payer_centimes,
+            }))}
+          />
           {recapRows.length === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
               Aucun membre.
