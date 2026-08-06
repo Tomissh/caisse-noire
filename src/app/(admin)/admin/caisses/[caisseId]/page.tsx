@@ -33,6 +33,7 @@ import type { EcritureItem } from "./ecritures/_components/list";
 import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
+import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
 
 function currentMonthDefault(): string {
   const now = new Date();
@@ -145,23 +146,18 @@ export default async function CaisseDashboardPage({
   // Podium des plus gros payeurs du mois calendaire en cours (paiements
   // agrégés par membre, dates brutes — indépendant du mois navigué dans le
   // récapitulatif ci-dessous et du décalage de 7 j de situation_caisse_mois).
-  const topPayeursByMembreId = new Map<string, { prenom: string; nom: string; total: number }>();
+  const topPayeursByMembreId = new Map<string, { prenom: string; total: number }>();
   for (const p of topPayeursRes.data ?? []) {
     if (!p.membre_id) continue;
     const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
     if (!m) continue;
-    const entry = topPayeursByMembreId.get(p.membre_id) ?? { prenom: m.prenom, nom: m.nom, total: 0 };
+    const entry = topPayeursByMembreId.get(p.membre_id) ?? { prenom: m.prenom, total: 0 };
     entry.total += p.montant_centimes;
     topPayeursByMembreId.set(p.membre_id, entry);
   }
   const topPayeurs = [...topPayeursByMembreId.entries()]
-    .map(([membreId, v]) => ({
-      membre_id: membreId,
-      prenom: v.prenom,
-      nom: v.nom,
-      paiements_mois_centimes: v.total,
-    }))
-    .sort((a, b) => b.paiements_mois_centimes - a.paiements_mois_centimes)
+    .map(([membreId, v]) => ({ id: membreId, prenom: v.prenom, montantCentimes: v.total }))
+    .sort((a, b) => b.montantCentimes - a.montantCentimes)
     .slice(0, 3);
 
   // Soldes par membre : deux requêtes séparées (membres + v_membre_situation)
@@ -493,55 +489,3 @@ export default async function CaisseDashboardPage({
   );
 }
 
-type PayeurRow = { membre_id: string; prenom: string; nom: string; paiements_mois_centimes: number };
-
-// Podium visuel : 2e à gauche, 1er au centre (plus grand), 3e à droite
-// (plus petit) — cf. maquette fournie.
-const PODIUM_SLOTS: {
-  rank: 0 | 1 | 2;
-  medal: string;
-  circle: string;
-  ring: string;
-}[] = [
-  {
-    rank: 1,
-    medal: "🥈",
-    circle: "h-24 w-24 text-sm",
-    ring: "border-zinc-300 dark:border-zinc-500",
-  },
-  {
-    rank: 0,
-    medal: "🥇",
-    circle: "h-28 w-28 text-base",
-    ring: "border-amber-400 dark:border-amber-500",
-  },
-  {
-    rank: 2,
-    medal: "🥉",
-    circle: "h-20 w-20 text-sm",
-    ring: "border-orange-700/70 dark:border-orange-600/70",
-  },
-];
-
-function PodiumPayeurs({ rows }: { rows: PayeurRow[] }) {
-  return (
-    <div className="flex items-end justify-center gap-6 rounded-lg border border-zinc-200 bg-white px-6 py-8 dark:border-zinc-800 dark:bg-zinc-900">
-      {PODIUM_SLOTS.map((slot) => {
-        const r = rows[slot.rank];
-        if (!r) return null;
-        return (
-          <div key={r.membre_id} className="flex flex-col items-center gap-2">
-            <div
-              className={`flex items-center justify-center rounded-full border-4 bg-zinc-50 font-mono font-bold text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 ${slot.circle} ${slot.ring}`}
-            >
-              {Math.round(r.paiements_mois_centimes / 100)}€
-            </div>
-            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {slot.medal} {r.prenom}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}

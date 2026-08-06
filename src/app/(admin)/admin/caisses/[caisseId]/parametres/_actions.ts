@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateCaisseCode } from "@/lib/caisse-code";
+import { generateCaisseCode, generatePassword } from "@/lib/caisse-code";
 import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 
 const uuid = z.uuid();
@@ -76,26 +76,47 @@ const addAdminSchema = z.object({
   email: z.email("Email invalide"),
 });
 
+type AddAdminResult = { ok: true; password?: string } | { ok: false; error: string };
+
+// Ajoute un admin à la caisse par email. Si aucun compte n'existe pour cet
+// email, en crée un à la volée (mot de passe généré, renvoyé une seule fois
+// à l'appelant pour transmission) — évite le détour obligatoire par
+// l'espace super-admin pour un simple créateur qui veut ajouter un co-admin.
 export async function addAdminAction(input: {
   caisseId: string;
   email: string;
-}): Promise<Result> {
+}): Promise<AddAdminResult> {
   const parsed = addAdminSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Email invalide" };
+
+  // Vérifie explicitement le rôle avant toute action service-role
+  // (createUser bypasse la RLS — ne pas se reposer uniquement dessus).
+  const ctx = await requireCaisseAdmin(parsed.data.caisseId);
+  if (ctx.role !== "createur" && ctx.role !== "super_admin") {
+    return { ok: false, error: "Seul le créateur peut ajouter un administrateur" };
+  }
 
   // Lookup auth.users via service-role (RLS ne s'applique pas)
   const admin = createAdminClient();
   // listUsers est paginé ; on filtre côté Node sur les premières pages
   const { data, error: errList } = await admin.auth.admin.listUsers({ perPage: 200 });
   if (errList) return { ok: false, error: errList.message };
-  const target = data.users.find(
+  let target = data.users.find(
     (u) => (u.email ?? "").toLowerCase() === parsed.data.email.toLowerCase(),
   );
+
+  let password: string | undefined;
   if (!target) {
-    return {
-      ok: false,
-      error: "Aucun compte avec cet email. Demande au super-admin de le créer.",
-    };
+    password = generatePassword(16);
+    const { data: createdUser, error: errCreate } = await admin.auth.admin.createUser({
+      email: parsed.data.email,
+      password,
+      email_confirm: true,
+    });
+    if (errCreate || !createdUser.user) {
+      return { ok: false, error: errCreate?.message ?? "Création du compte impossible" };
+    }
+    target = createdUser.user;
   }
 
   const supabase = await createClient();
@@ -108,7 +129,7 @@ export async function addAdminAction(input: {
     return { ok: false, error: error.message };
   }
   revalidatePath(`/admin/caisses/${parsed.data.caisseId}/parametres`);
-  return { ok: true };
+  return password ? { ok: true, password } : { ok: true };
 }
 
 const removeAdminSchema = z.object({ caisseId: uuid, userId: uuid });

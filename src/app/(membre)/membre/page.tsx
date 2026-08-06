@@ -5,7 +5,9 @@
 // Données (toutes filtrées par RLS via JWT custom) :
 //   - mon solde et mes totaux (v_membre_situation)
 //   - solde caisse global (v_caisse_solde)
-//   - top 3 des plus gros payeurs (v_membre_situation order paiements desc)
+//   - podium des plus gros payeurs du mois calendaire en cours — mêmes
+//     paiements bruts (non décalés) et même composant que le dashboard
+//     admin, pour afficher des montants identiques des deux côtés
 //   - soldes par membre — uniquement solde, pour transparence (point 4 = b)
 //   - mes amendes (5 dernières) + mes paiements (5 derniers)
 //   - retraits de la caisse (transparence — point 6)
@@ -15,6 +17,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMembreAuth } from "@/lib/auth/membre-context";
 import { formatEuros, formatSolde } from "@/lib/format";
+import { PodiumPayeurs, type PayeurRow } from "@/components/features/PodiumPayeurs";
+
+// Bornes [début, fin) du mois calendaire en cours, en UTC — identique à la
+// logique du dashboard admin (src/app/(admin)/admin/caisses/[caisseId]/page.tsx).
+function currentCalendarMonthBounds(): { debut: string; fin: string } {
+  const now = new Date();
+  const debut = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const fin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { debut: debut.toISOString(), fin: fin.toISOString() };
+}
 
 type Situation = {
   membre_id: string | null;
@@ -56,6 +68,7 @@ type Data = {
   monTotalPaiements: number;
   soldeCaisse: number;
   situations: Situation[];
+  topPayeursMois: PayeurRow[];
   amendes: Amende[];
   paiements: Paiement[];
   retraits: Retrait[];
@@ -84,12 +97,15 @@ export default function MembreDashboardPage() {
     let cancelled = false;
     const load = async () => {
       try {
+        const { debut: moisDebut, fin: moisFin } = currentCalendarMonthBounds();
+
         const [
           caisseRes,
           moiRes,
           membresRes,
           situationsRes,
           soldeRes,
+          paiementsMoisRes,
           amendesRes,
           paiementsRes,
           retraitsRes,
@@ -117,6 +133,13 @@ export default function MembreDashboardPage() {
               .select("solde_centimes")
               .eq("caisse_id", claims.caisse_id)
               .maybeSingle(),
+            supabase
+              .from("paiements")
+              .select("membre_id, montant_centimes, membres(prenom, nom)")
+              .eq("caisse_id", claims.caisse_id)
+              .is("supprimee_at", null)
+              .gte("created_at", moisDebut)
+              .lt("created_at", moisFin),
             supabase
               .from("amendes")
               .select("id, libelle, montant_centimes, created_at")
@@ -174,6 +197,22 @@ export default function MembreDashboardPage() {
 
         const mySit = situations.find((s) => s.membre_id === claims.membre_id);
 
+        // Podium du mois en cours : paiements bruts (non décalés), agrégés
+        // par membre — même calcul que le dashboard admin.
+        const topPayeursByMembreId = new Map<string, { prenom: string; total: number }>();
+        for (const p of paiementsMoisRes.data ?? []) {
+          if (!p.membre_id) continue;
+          const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+          if (!m) continue;
+          const entry = topPayeursByMembreId.get(p.membre_id) ?? { prenom: m.prenom, total: 0 };
+          entry.total += p.montant_centimes;
+          topPayeursByMembreId.set(p.membre_id, entry);
+        }
+        const topPayeursMois: PayeurRow[] = [...topPayeursByMembreId.entries()]
+          .map(([membreId, v]) => ({ id: membreId, prenom: v.prenom, montantCentimes: v.total }))
+          .sort((a, b) => b.montantCentimes - a.montantCentimes)
+          .slice(0, 3);
+
         setData({
           caisseNom: caisseRes.data?.nom ?? "—",
           caisseCode: caisseRes.data?.code ?? "—",
@@ -183,6 +222,7 @@ export default function MembreDashboardPage() {
           monTotalPaiements: mySit?.total_paiements_centimes ?? 0,
           soldeCaisse: soldeRes.data?.solde_centimes ?? 0,
           situations,
+          topPayeursMois,
           amendes: (amendesRes.data ?? []) as Amende[],
           paiements: (paiementsRes.data ?? []) as Paiement[],
           retraits: (retraitsRes.data ?? []) as Retrait[],
@@ -217,11 +257,6 @@ export default function MembreDashboardPage() {
     );
   }
 
-  const top3Payeurs = [...data.situations]
-    .filter((s) => (s.total_paiements_centimes ?? 0) > 0)
-    .sort((a, b) => (b.total_paiements_centimes ?? 0) - (a.total_paiements_centimes ?? 0))
-    .slice(0, 3);
-
   const soldesAutres = [...data.situations]
     .filter((s) => s.membre_id !== claims.membre_id)
     .sort((a, b) => (b.solde_centimes ?? 0) - (a.solde_centimes ?? 0));
@@ -238,32 +273,17 @@ export default function MembreDashboardPage() {
         </p>
       </header>
 
-      {/* Top 3 payeurs --------------------------------------------------- */}
-      <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Top 3 payeurs
-        </div>
-        {top3Payeurs.length === 0 ? (
-          <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Aucun paiement.</div>
+      {/* Plus gros payeurs du mois --------------------------------------- */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+          Plus gros payeurs du mois
+        </h2>
+        {data.topPayeursMois.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+            Aucun paiement ce mois-ci.
+          </p>
         ) : (
-          <ol className="mt-2 space-y-1 text-sm">
-            {top3Payeurs.map((p, i) => (
-              <li
-                key={p.membre_id}
-                className="flex items-center justify-between text-zinc-700 dark:text-zinc-300"
-              >
-                <span>
-                  <span className="mr-1 inline-block w-4 text-zinc-500 dark:text-zinc-400">
-                    {i + 1}.
-                  </span>
-                  {p.prenom} {p.nom}
-                </span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                  {formatEuros(p.total_paiements_centimes ?? 0)}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <PodiumPayeurs rows={data.topPayeursMois} />
         )}
       </section>
 

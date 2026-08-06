@@ -1,8 +1,9 @@
 "use client";
 
 // Bloc gestion des admins additionnels.
-// L'ajout demande un email correspondant à un compte Supabase Auth existant.
-// La création de comptes admin est réservée au super-admin (Phase 4.D).
+// L'ajout se fait par email : si un compte existe déjà, il est simplement
+// lié à la caisse ; sinon il est créé à la volée (mot de passe généré,
+// affiché une seule fois) — pas besoin de passer par l'espace super-admin.
 
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -26,6 +27,7 @@ export function AdminsBlock({
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const {
     register,
@@ -39,13 +41,19 @@ export function AdminsBlock({
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
+    setCreated(null);
     const res = await addAdminAction({ caisseId, email: values.email });
     if (!res.ok) {
       setServerError(res.error);
       toast.error(res.error);
       return;
     }
-    toast.success("Admin ajouté");
+    if (res.password) {
+      setCreated({ email: values.email, password: res.password });
+      toast.success("Compte créé et admin ajouté");
+    } else {
+      toast.success("Admin ajouté");
+    }
     reset({ email: "" });
     router.refresh();
   };
@@ -76,6 +84,33 @@ export function AdminsBlock({
         )}
       </div>
 
+      {created && (
+        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+            Compte créé — note ce mot de passe, il n&apos;apparaîtra plus.
+          </p>
+          <dl className="space-y-1 text-sm">
+            <div>
+              <dt className="text-xs font-medium text-emerald-800 dark:text-emerald-300">Email</dt>
+              <dd className="font-mono text-zinc-900 dark:text-zinc-50">{created.email}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                Mot de passe
+              </dt>
+              <dd className="font-mono text-zinc-900 dark:text-zinc-50">{created.password}</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            onClick={() => setCreated(null)}
+            className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+          >
+            OK, noté
+          </button>
+        </div>
+      )}
+
       {admins.length === 0 ? (
         <p className="text-xs text-zinc-500 dark:text-zinc-400">Aucun admin additionnel.</p>
       ) : (
@@ -103,7 +138,7 @@ export function AdminsBlock({
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1">
               <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                Email d&apos;un compte existant
+                Email (compte existant, ou nouveau — sera créé automatiquement)
               </label>
               <input
                 type="email"
