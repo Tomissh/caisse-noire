@@ -208,10 +208,22 @@ export default function MembreDashboardPage() {
           entry.total += p.montant_centimes;
           topPayeursByMembreId.set(p.membre_id, entry);
         }
-        const topPayeursMois: PayeurRow[] = [...topPayeursByMembreId.entries()]
+        const topPayeursSansPhoto = [...topPayeursByMembreId.entries()]
           .map(([membreId, v]) => ({ id: membreId, prenom: v.prenom, montantCentimes: v.total }))
           .sort((a, b) => b.montantCentimes - a.montantCentimes)
           .slice(0, 3);
+
+        // Photo de profil du podium : URL signée (bucket privé "avatars"),
+        // même logique que le dashboard admin — retombe sur l'avatar par
+        // défaut si absente.
+        const topPayeursMois: PayeurRow[] = await Promise.all(
+          topPayeursSansPhoto.map(async (p) => {
+            const { data } = await supabase.storage
+              .from("avatars")
+              .createSignedUrl(`${claims.caisse_id}/${p.id}/avatar`, 3600);
+            return { ...p, avatarUrl: data?.signedUrl ?? null };
+          }),
+        );
 
         setData({
           caisseNom: caisseRes.data?.nom ?? "—",

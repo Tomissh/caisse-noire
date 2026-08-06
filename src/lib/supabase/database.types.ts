@@ -71,6 +71,7 @@ export type Database = {
           created_at: string
           declaree_par_user_id: string
           id: string
+          jour_match: boolean
           libelle: string
           membre_id: string
           montant_centimes: number
@@ -84,6 +85,7 @@ export type Database = {
           created_at?: string
           declaree_par_user_id: string
           id?: string
+          jour_match?: boolean
           libelle: string
           membre_id: string
           montant_centimes: number
@@ -97,6 +99,7 @@ export type Database = {
           created_at?: string
           declaree_par_user_id?: string
           id?: string
+          jour_match?: boolean
           libelle?: string
           membre_id?: string
           montant_centimes?: number

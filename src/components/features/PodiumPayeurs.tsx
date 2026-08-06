@@ -4,31 +4,43 @@
 //
 // Positions : 2e à gauche, 1er au centre (plus grand), 3e à droite (plus
 // petit), tailles décroissantes — cf. maquette fournie.
+//
+// Chaque slot affiche la photo de profil du membre (avatar rond, URL signée
+// résolue côté appelant) ; à défaut de photo, `Avatar` retombe sur son
+// pictogramme par défaut. Le montant est affiché sous le nom, plus la photo
+// ne sert plus à afficher le montant.
 
-export type PayeurRow = { id: string; prenom: string; montantCentimes: number };
+import { Avatar } from "./Avatar";
+
+export type PayeurRow = {
+  id: string;
+  prenom: string;
+  montantCentimes: number;
+  avatarUrl?: string | null;
+};
 
 const PODIUM_SLOTS: {
   rank: 0 | 1 | 2;
   medal: string;
-  circle: string;
+  size: number;
   ring: string;
 }[] = [
   {
     rank: 1,
     medal: "🥈",
-    circle: "h-24 w-24 text-sm",
+    size: 96,
     ring: "border-zinc-300 dark:border-zinc-500",
   },
   {
     rank: 0,
     medal: "🥇",
-    circle: "h-28 w-28 text-base",
+    size: 112,
     ring: "border-amber-400 dark:border-amber-500",
   },
   {
     rank: 2,
     medal: "🥉",
-    circle: "h-20 w-20 text-sm",
+    size: 80,
     ring: "border-orange-700/70 dark:border-orange-600/70",
   },
 ];
@@ -41,13 +53,19 @@ export function PodiumPayeurs({ rows }: { rows: PayeurRow[] }) {
         if (!r) return null;
         return (
           <div key={r.id} className="flex flex-col items-center gap-2">
-            <div
-              className={`flex items-center justify-center rounded-full border-4 bg-zinc-50 font-mono font-bold text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 ${slot.circle} ${slot.ring}`}
-            >
-              {Math.round(r.montantCentimes / 100)}€
-            </div>
-            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {slot.medal} {r.prenom}
+            <Avatar
+              src={r.avatarUrl}
+              size={slot.size}
+              alt={r.prenom}
+              className={`border-4 ${slot.ring}`}
+            />
+            <div className="flex flex-col items-center text-center">
+              <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {slot.medal} {r.prenom}
+              </div>
+              <div className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                {Math.round(r.montantCentimes / 100)}€
+              </div>
             </div>
           </div>
         );

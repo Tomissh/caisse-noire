@@ -8,10 +8,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { recordPaiementAction } from "../../_actions";
 
+// Moyen de paiement : toujours espèces (pas d'autre moyen accepté par la
+// caisse), donc pas de choix à faire à la saisie.
+const MOYEN = "especes" as const;
+
 const schema = z.object({
   membreId: z.uuid("Sélectionnez un membre"),
   montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
-  moyen: z.enum(["especes", "virement", "autre"]),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -30,12 +33,12 @@ export function PaiementForm({
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { membreId: "", montantEuros: 10, moyen: "especes" },
+    defaultValues: { membreId: "", montantEuros: 10 },
   });
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
-    const res = await recordPaiementAction({ caisseId, ...values });
+    const res = await recordPaiementAction({ caisseId, ...values, moyen: MOYEN });
     if (!res.ok) {
       setServerError(res.error);
       toast.error(res.error);
@@ -85,24 +88,6 @@ export function PaiementForm({
           <p className="text-xs text-red-600 dark:text-red-400">{errors.montantEuros.message}</p>
         )}
       </div>
-
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Moyen</legend>
-        <div className="flex gap-3 text-sm">
-          <label className="flex items-center gap-1.5">
-            <input type="radio" value="especes" {...register("moyen")} className="size-4" />
-            <span>Espèces</span>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="radio" value="virement" {...register("moyen")} className="size-4" />
-            <span>Virement</span>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="radio" value="autre" {...register("moyen")} className="size-4" />
-            <span>Autre</span>
-          </label>
-        </div>
-      </fieldset>
 
       {serverError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">

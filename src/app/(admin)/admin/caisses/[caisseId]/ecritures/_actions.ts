@@ -32,6 +32,7 @@ const amendeRowSchema = z.object({
   libelle: z.string().trim().min(1, "Libellé requis").max(120),
   montantEuros: z.number().int().positive().max(10_000),
   membreId: uuid,
+  jourMatch: z.boolean(),
 });
 
 const declareAmendesBatchSchema = z
@@ -48,6 +49,7 @@ export async function declareAmendesBatchAction(input: {
     libelle: string;
     montantEuros: number;
     membreId: string;
+    jourMatch: boolean;
   }[];
 }): Promise<Result> {
   const parsed = declareAmendesBatchSchema.safeParse(input);
@@ -68,6 +70,7 @@ export async function declareAmendesBatchAction(input: {
     libelle: r.libelle,
     montant_centimes: eurosToCentimes(r.montantEuros),
     declaree_par_user_id: user.id,
+    jour_match: r.jourMatch,
   }));
 
   const { error, count } = await supabase

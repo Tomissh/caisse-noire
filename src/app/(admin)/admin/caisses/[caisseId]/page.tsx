@@ -110,7 +110,7 @@ export default async function CaisseDashboardPage({
     supabase
       .from("amendes")
       .select(
-        "id, caisse_id, membre_id, libelle, montant_centimes, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(prenom, nom)",
+        "id, caisse_id, membre_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(prenom, nom)",
       )
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null)
@@ -155,10 +155,21 @@ export default async function CaisseDashboardPage({
     entry.total += p.montant_centimes;
     topPayeursByMembreId.set(p.membre_id, entry);
   }
-  const topPayeurs = [...topPayeursByMembreId.entries()]
+  const topPayeursSansPhoto = [...topPayeursByMembreId.entries()]
     .map(([membreId, v]) => ({ id: membreId, prenom: v.prenom, montantCentimes: v.total }))
     .sort((a, b) => b.montantCentimes - a.montantCentimes)
     .slice(0, 3);
+
+  // Photo de profil du podium : URL signée (bucket privé "avatars"), résolue
+  // par membre ; retombe sur l'avatar par défaut si absente.
+  const topPayeurs = await Promise.all(
+    topPayeursSansPhoto.map(async (p) => {
+      const { data } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(`${caisseId}/${p.id}/avatar`, 3600);
+      return { ...p, avatarUrl: data?.signedUrl ?? null };
+    }),
+  );
 
   // Soldes par membre : deux requêtes séparées (membres + v_membre_situation)
   // fusionnées côté client, plutôt qu'un embed PostgREST qui échoue silen-
@@ -218,6 +229,7 @@ export default async function CaisseDashboardPage({
       libelle: a.libelle,
       membreNom: m ? `${m.prenom} ${m.nom}` : null,
       moyen: null,
+      jourMatch: a.jour_match,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? a.declaree_par_user_id.slice(0, 8),
       supprimeeAt: a.supprimee_at,
       motifSuppression: a.motif_suppression,
@@ -235,6 +247,7 @@ export default async function CaisseDashboardPage({
       libelle: m ? `Paiement ${m.prenom} ${m.nom}` : "Paiement",
       membreNom: m ? `${m.prenom} ${m.nom}` : null,
       moyen: p.moyen,
+      jourMatch: false,
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? p.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: p.supprimee_at,
       motifSuppression: p.motif_suppression,
@@ -251,6 +264,7 @@ export default async function CaisseDashboardPage({
       libelle: r.libelle,
       membreNom: null,
       moyen: null,
+      jourMatch: false,
       acteurEmail: emailById.get(r.enregistre_par_user_id) ?? r.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: null,
       motifSuppression: null,

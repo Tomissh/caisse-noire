@@ -78,7 +78,7 @@ export default async function EcrituresPage({
         let q = supabase
           .from("amendes")
           .select(
-            "id, caisse_id, membre_id, motif_id, libelle, montant_centimes, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, prenom, nom)",
+            "id, caisse_id, membre_id, motif_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, prenom, nom)",
           )
           .eq("caisse_id", caisseId)
           .order("created_at", { ascending: false })
@@ -169,6 +169,7 @@ export default async function EcrituresPage({
       libelle: a.libelle,
       membreNom: m ? `${m.prenom} ${m.nom}` : "(membre supprimé)",
       moyen: null,
+      jourMatch: a.jour_match,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? a.declaree_par_user_id.slice(0, 8),
       supprimeeAt: a.supprimee_at,
       motifSuppression: a.motif_suppression,
@@ -188,6 +189,7 @@ export default async function EcrituresPage({
       libelle: m ? `Paiement ${m.prenom} ${m.nom}` : "Paiement",
       membreNom: m ? `${m.prenom} ${m.nom}` : "(membre supprimé)",
       moyen: p.moyen,
+      jourMatch: false,
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? p.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: p.supprimee_at,
       motifSuppression: p.motif_suppression,
@@ -206,6 +208,7 @@ export default async function EcrituresPage({
       libelle: r.libelle,
       membreNom: null,
       moyen: null,
+      jourMatch: false,
       acteurEmail: emailById.get(r.enregistre_par_user_id) ?? r.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: null,
       motifSuppression: null,

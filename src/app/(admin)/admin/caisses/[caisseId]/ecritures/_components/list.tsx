@@ -19,6 +19,7 @@ export type EcritureItem = {
   libelle: string;
   membreNom: string | null;
   moyen: "especes" | "virement" | "autre" | null;
+  jourMatch: boolean;
   acteurEmail: string;
   supprimeeAt: string | null;
   motifSuppression: string | null;
@@ -110,6 +111,11 @@ export function EcrituresList({
                   {it.moyen && (
                     <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                       {MOYEN_LABEL[it.moyen]}
+                    </span>
+                  )}
+                  {it.jourMatch && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                      jour de match ×2
                     </span>
                   )}
                   {isDeleted && (

@@ -45,6 +45,7 @@ const rowSchema = z.object({
   motifSelection: z.string(), // motifId ou FREE
   libelle: z.string().trim().min(1, "Libellé requis").max(120),
   montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
+  jourMatch: z.boolean(),
 });
 
 const schema = z.object({
@@ -53,7 +54,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 function emptyRow(): FormValues["rows"][number] {
-  return { membreId: "", motifSelection: FREE, libelle: "", montantEuros: 5 };
+  return { membreId: "", motifSelection: FREE, libelle: "", montantEuros: 5, jourMatch: false };
 }
 
 export function AmendeForm({
@@ -86,6 +87,7 @@ export function AmendeForm({
       libelle: r.libelle,
       montantEuros: r.montantEuros,
       membreId: r.membreId,
+      jourMatch: r.jourMatch,
     }));
 
     const res = await declareAmendesBatchAction({ caisseId, rows });
@@ -177,6 +179,8 @@ function AmendeRowFields({
   canRemove: boolean;
 }) {
   const motifSelection = useWatch({ control, name: `rows.${index}.motifSelection` });
+  const montantEuros = useWatch({ control, name: `rows.${index}.montantEuros` });
+  const jourMatch = useWatch({ control, name: `rows.${index}.jourMatch` });
 
   const selectedMotif = useMemo<MotifOption | null>(() => {
     if (motifSelection === FREE) return null;
@@ -286,6 +290,25 @@ function AmendeRowFields({
             <p className="text-xs text-red-600 dark:text-red-400">{errors.montantEuros.message}</p>
           )}
         </div>
+      </div>
+
+      {/* Jour de match --------------------------------------------------- */}
+      <div className="space-y-1">
+        <label className="flex items-center gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            className="size-4"
+            {...register(`rows.${index}.jourMatch`)}
+          />
+          <span className="text-zinc-700 dark:text-zinc-300">
+            Jour de match (montant ×2)
+          </span>
+        </label>
+        {jourMatch && Number.isFinite(montantEuros) && (
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            Montant final : {montantEuros * 2} €
+          </p>
+        )}
       </div>
     </div>
   );
