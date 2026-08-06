@@ -171,9 +171,11 @@ export default async function CaisseDashboardPage({
     }),
   );
 
-  // Soldes par membre : deux requêtes séparées (membres + v_membre_situation)
-  // fusionnées côté client, plutôt qu'un embed PostgREST qui échoue silen-
-  // cieusement (une vue n'expose pas de clé étrangère vers `membres`).
+  // Dettes : deux requêtes séparées (membres + v_membre_situation) fusionnées
+  // côté client, plutôt qu'un embed PostgREST qui échoue silencieusement
+  // (une vue n'expose pas de clé étrangère vers `membres`). Solde = cumul
+  // paiements − amendes (v_membre_situation) ; triées du plus endetté (solde
+  // le plus négatif) au plus créditeur.
   const soldeByMembreId = new Map<string, number>();
   for (const r of situationsRes.data ?? []) {
     if (r.membre_id) soldeByMembreId.set(r.membre_id, r.solde_centimes ?? 0);
@@ -186,7 +188,7 @@ export default async function CaisseDashboardPage({
       actif: m.actif,
       solde: soldeByMembreId.get(m.id) ?? 0,
     }))
-    .sort((a, b) => b.solde - a.solde);
+    .sort((a, b) => a.solde - b.solde);
 
   // Récapitulatif mensuel
   const recapRows = [...(recapMoisRes.data ?? [])].sort((a, b) => {
@@ -315,14 +317,14 @@ export default async function CaisseDashboardPage({
             Total de la caisse
           </div>
           <div className="mt-1 font-mono text-4xl font-bold text-zinc-900 dark:text-zinc-50">
-            {formatSolde(soldePhysique)}
+            {formatEuros(soldePhysique)}
           </div>
         </section>
 
         {/* Podium des plus gros payeurs du mois --------------------------- */}
         <section className="space-y-3">
           <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-            Plus gros payeurs du mois
+            Plus gros payeurs du mois 🏆
           </h2>
           {topPayeurs.length === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
@@ -430,7 +432,7 @@ export default async function CaisseDashboardPage({
         <section className="space-y-3">
           <header className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-              Soldes par membre
+              Dettes 💸
             </h2>
             <Link
               href={`/admin/caisses/${caisseId}/membres`}

@@ -288,7 +288,7 @@ export default function MembreDashboardPage() {
       {/* Plus gros payeurs du mois --------------------------------------- */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-          Plus gros payeurs du mois
+          Plus gros payeurs du mois 🏆
         </h2>
         {data.topPayeursMois.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
