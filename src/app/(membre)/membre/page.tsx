@@ -5,9 +5,8 @@
 // Données (toutes filtrées par RLS via JWT custom) :
 //   - mon solde et mes totaux (v_membre_situation)
 //   - solde caisse global (v_caisse_solde)
-//   - podium des plus gros payeurs du mois calendaire en cours — mêmes
-//     paiements bruts (non décalés) et même composant que le dashboard
-//     admin, pour afficher des montants identiques des deux côtés
+//   - podium des dettes — top 3 des soldes les plus bas, même composant et
+//     mêmes données que le dashboard admin
 //   - soldes par membre — uniquement solde, pour transparence (point 4 = b)
 //   - mes amendes (5 dernières) + mes paiements (5 derniers)
 //   - retraits de la caisse (transparence — point 6)
@@ -18,15 +17,6 @@ import Link from "next/link";
 import { useMembreAuth } from "@/lib/auth/membre-context";
 import { formatEuros, formatSolde } from "@/lib/format";
 import { PodiumPayeurs, type PayeurRow } from "@/components/features/PodiumPayeurs";
-
-// Bornes [début, fin) du mois calendaire en cours, en UTC — identique à la
-// logique du dashboard admin (src/app/(admin)/admin/caisses/[caisseId]/page.tsx).
-function currentCalendarMonthBounds(): { debut: string; fin: string } {
-  const now = new Date();
-  const debut = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const fin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { debut: debut.toISOString(), fin: fin.toISOString() };
-}
 
 type Situation = {
   membre_id: string | null;
@@ -67,7 +57,7 @@ type Data = {
   monTotalPaiements: number;
   soldeCaisse: number;
   situations: Situation[];
-  topPayeursMois: PayeurRow[];
+  podiumDettes: PayeurRow[];
   amendes: Amende[];
   paiements: Paiement[];
   retraits: Retrait[];
@@ -96,15 +86,12 @@ export default function MembreDashboardPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const { debut: moisDebut, fin: moisFin } = currentCalendarMonthBounds();
-
         const [
           caisseRes,
           moiRes,
           membresRes,
           situationsRes,
           soldeRes,
-          paiementsMoisRes,
           amendesRes,
           paiementsRes,
           retraitsRes,
@@ -132,13 +119,6 @@ export default function MembreDashboardPage() {
               .select("solde_centimes")
               .eq("caisse_id", claims.caisse_id)
               .maybeSingle(),
-            supabase
-              .from("paiements")
-              .select("membre_id, montant_centimes, membres(nom)")
-              .eq("caisse_id", claims.caisse_id)
-              .is("supprimee_at", null)
-              .gte("created_at", moisDebut)
-              .lt("created_at", moisFin),
             supabase
               .from("amendes")
               .select("id, libelle, montant_centimes, created_at")
@@ -195,27 +175,18 @@ export default function MembreDashboardPage() {
 
         const mySit = situations.find((s) => s.membre_id === claims.membre_id);
 
-        // Podium du mois en cours : paiements bruts (non décalés), agrégés
-        // par membre — même calcul que le dashboard admin.
-        const topPayeursByMembreId = new Map<string, { nom: string; total: number }>();
-        for (const p of paiementsMoisRes.data ?? []) {
-          if (!p.membre_id) continue;
-          const m = (p.membres as unknown as { nom: string } | null) ?? null;
-          if (!m) continue;
-          const entry = topPayeursByMembreId.get(p.membre_id) ?? { nom: m.nom, total: 0 };
-          entry.total += p.montant_centimes;
-          topPayeursByMembreId.set(p.membre_id, entry);
-        }
-        const topPayeursSansPhoto = [...topPayeursByMembreId.entries()]
-          .map(([membreId, v]) => ({ id: membreId, nom: v.nom, montantCentimes: v.total }))
-          .sort((a, b) => b.montantCentimes - a.montantCentimes)
-          .slice(0, 3);
+        // Podium des dettes : top 3 des soldes les plus bas — même calcul
+        // que le dashboard admin.
+        const podiumDettesSansPhoto = [...situations]
+          .sort((a, b) => (a.solde_centimes ?? 0) - (b.solde_centimes ?? 0))
+          .slice(0, 3)
+          .map((s) => ({ id: s.membre_id!, nom: s.nom, montantCentimes: s.solde_centimes ?? 0 }));
 
         // Photo de profil du podium : URL signée (bucket privé "avatars"),
         // même logique que le dashboard admin — retombe sur l'avatar par
         // défaut si absente.
-        const topPayeursMois: PayeurRow[] = await Promise.all(
-          topPayeursSansPhoto.map(async (p) => {
+        const podiumDettes: PayeurRow[] = await Promise.all(
+          podiumDettesSansPhoto.map(async (p) => {
             const { data } = await supabase.storage
               .from("avatars")
               .createSignedUrl(`${claims.caisse_id}/${p.id}/avatar`, 3600);
@@ -232,7 +203,7 @@ export default function MembreDashboardPage() {
           monTotalPaiements: mySit?.total_paiements_centimes ?? 0,
           soldeCaisse: soldeRes.data?.solde_centimes ?? 0,
           situations,
-          topPayeursMois,
+          podiumDettes,
           amendes: (amendesRes.data ?? []) as Amende[],
           paiements: (paiementsRes.data ?? []) as Paiement[],
           retraits: (retraitsRes.data ?? []) as Retrait[],
@@ -283,17 +254,17 @@ export default function MembreDashboardPage() {
         </p>
       </header>
 
-      {/* Plus gros payeurs du mois --------------------------------------- */}
+      {/* Plus grosses dettes ---------------------------------------------- */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-          Plus gros payeurs du mois 🏆
+          Plus grosses dettes 🏆
         </h2>
-        {data.topPayeursMois.length === 0 ? (
+        {data.podiumDettes.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-            Aucun paiement ce mois-ci.
+            Aucun membre.
           </p>
         ) : (
-          <PodiumPayeurs rows={data.topPayeursMois} />
+          <PodiumPayeurs rows={data.podiumDettes} />
         )}
       </section>
 

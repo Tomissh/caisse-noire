@@ -27,7 +27,23 @@ export function ClassementPanel({ rows }: { rows: ClassementRow[] }) {
   const onCopy = async () => {
     const text = rows.map(formatLine).join("\n");
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback pour les navigateurs mobiles/webviews qui n'exposent pas
+        // (ou bloquent) l'API Clipboard asynchrone.
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.top = "-1000px";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (!ok) throw new Error("execCommand copy failed");
+      }
       toast.success("Classement copié");
     } catch {
       toast.error("Copie impossible");

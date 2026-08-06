@@ -5,11 +5,9 @@
 //
 // Actions rapides : nouvelle amende / nouveau paiement / nouveau retrait.
 //
-// Podium des plus gros payeurs : top 3 par somme des paiements du mois
-// calendaire en cours (dates brutes, requête directe sur `paiements` —
-// indépendant du mois navigué dans le récap ci-dessous et du décalage de
-// 7 j appliqué par situation_caisse_mois pour le rattachement des paiements
-// au mois des amendes qu'ils soldent).
+// Podium des dettes : top 3 des membres au solde le plus bas (les plus
+// endettés), sur la base du solde actuel (v_membre_situation), pas des
+// paiements du mois — même donnée que la section Dettes, en médailles.
 //
 // Récapitulatif mensuel : ce que chaque membre doit encore payer pour un
 // mois donné, en tenant compte de son solde reporté (avance/retard) —
@@ -44,18 +42,6 @@ function currentMonthDefault(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-// Bornes [début, fin) du mois calendaire en cours, en UTC. Utilisées pour le
-// podium des plus gros payeurs : contrairement au récapitulatif mensuel, ce
-// classement porte sur les paiements réellement encaissés ce mois-ci (dates
-// brutes, sans le décalage de 7 j appliqué par situation_caisse_mois pour
-// rattacher un paiement au mois des amendes qu'il solde).
-function currentCalendarMonthBounds(): { debut: string; fin: string } {
-  const now = new Date();
-  const debut = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const fin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { debut: debut.toISOString(), fin: fin.toISOString() };
-}
-
 function moisLabel(mois: string): string {
   const [y, m] = mois.split("-").map(Number);
   const d = new Date(Date.UTC(y ?? 2026, (m ?? 1) - 1, 1));
@@ -76,7 +62,6 @@ export default async function CaisseDashboardPage({
   const supabase = await createClient();
 
   const mois = /^\d{4}-\d{2}$/.test(moisParam ?? "") ? moisParam! : currentMonthDefault();
-  const { debut: moisEnCoursDebut, fin: moisEnCoursFin } = currentCalendarMonthBounds();
 
   const [
     soldeRes,
@@ -86,7 +71,6 @@ export default async function CaisseDashboardPage({
     motifsRes,
     situationsRes,
     recapMoisRes,
-    topPayeursRes,
     amendesLastRes,
     paiementsLastRes,
     retraitsLastRes,
@@ -110,13 +94,6 @@ export default async function CaisseDashboardPage({
       .select("membre_id, solde_centimes")
       .eq("caisse_id", caisseId),
     supabase.rpc("situation_caisse_mois", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
-    supabase
-      .from("paiements")
-      .select("membre_id, montant_centimes, membres(nom)")
-      .eq("caisse_id", caisseId)
-      .is("supprimee_at", null)
-      .gte("created_at", moisEnCoursDebut)
-      .lt("created_at", moisEnCoursFin),
     supabase
       .from("amendes")
       .select(
@@ -164,34 +141,6 @@ export default async function CaisseDashboardPage({
     montantVariable: m.montant_variable,
   }));
 
-  // Podium des plus gros payeurs du mois calendaire en cours (paiements
-  // agrégés par membre, dates brutes — indépendant du mois navigué dans le
-  // récapitulatif ci-dessous et du décalage de 7 j de situation_caisse_mois).
-  const topPayeursByMembreId = new Map<string, { nom: string; total: number }>();
-  for (const p of topPayeursRes.data ?? []) {
-    if (!p.membre_id) continue;
-    const m = (p.membres as unknown as { nom: string } | null) ?? null;
-    if (!m) continue;
-    const entry = topPayeursByMembreId.get(p.membre_id) ?? { nom: m.nom, total: 0 };
-    entry.total += p.montant_centimes;
-    topPayeursByMembreId.set(p.membre_id, entry);
-  }
-  const topPayeursSansPhoto = [...topPayeursByMembreId.entries()]
-    .map(([membreId, v]) => ({ id: membreId, nom: v.nom, montantCentimes: v.total }))
-    .sort((a, b) => b.montantCentimes - a.montantCentimes)
-    .slice(0, 3);
-
-  // Photo de profil du podium : URL signée (bucket privé "avatars"), résolue
-  // par membre ; retombe sur l'avatar par défaut si absente.
-  const topPayeurs = await Promise.all(
-    topPayeursSansPhoto.map(async (p) => {
-      const { data } = await supabase.storage
-        .from("avatars")
-        .createSignedUrl(`${caisseId}/${p.id}/avatar`, 3600);
-      return { ...p, avatarUrl: data?.signedUrl ?? null };
-    }),
-  );
-
   // Dettes : deux requêtes séparées (membres + v_membre_situation) fusionnées
   // côté client, plutôt qu'un embed PostgREST qui échoue silencieusement
   // (une vue n'expose pas de clé étrangère vers `membres`). Solde = cumul
@@ -209,6 +158,23 @@ export default async function CaisseDashboardPage({
       solde: soldeByMembreId.get(m.id) ?? 0,
     }))
     .sort((a, b) => a.solde - b.solde);
+
+  // Podium des dettes : top 3 des soldes les plus bas (mêmes données que
+  // "Dettes" ci-dessous, en médailles).
+  const podiumDettesSansPhoto = soldesParMembre
+    .slice(0, 3)
+    .map((m) => ({ id: m.membreId, nom: m.nom, montantCentimes: m.solde }));
+
+  // Photo de profil du podium : URL signée (bucket privé "avatars"), résolue
+  // par membre ; retombe sur l'avatar par défaut si absente.
+  const podiumDettes = await Promise.all(
+    podiumDettesSansPhoto.map(async (p) => {
+      const { data } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(`${caisseId}/${p.id}/avatar`, 3600);
+      return { ...p, avatarUrl: data?.signedUrl ?? null };
+    }),
+  );
 
   // Récapitulatif mensuel
   const recapRows = [...(recapMoisRes.data ?? [])].sort((a, b) => {
@@ -326,17 +292,17 @@ export default async function CaisseDashboardPage({
           </div>
         </section>
 
-        {/* Podium des plus gros payeurs du mois --------------------------- */}
+        {/* Podium des dettes ------------------------------------------------ */}
         <section className="space-y-3">
           <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-            Plus gros payeurs du mois 🏆
+            Plus grosses dettes 🏆
           </h2>
-          {topPayeurs.length === 0 ? (
+          {podiumDettes.length === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-              Aucun paiement ce mois-ci.
+              Aucun membre.
             </p>
           ) : (
-            <PodiumPayeurs rows={topPayeurs} />
+            <PodiumPayeurs rows={podiumDettes} />
           )}
         </section>
 
@@ -423,6 +389,9 @@ export default async function CaisseDashboardPage({
                     <th className="px-3 py-2">Membre</th>
                     <th className="px-3 py-2 text-right">Solde reporté</th>
                     <th className="px-3 py-2 text-right">Amendes du mois</th>
+                    {ctx.caisse.cotisation_active && (
+                      <th className="px-3 py-2 text-right">Cotisation</th>
+                    )}
                     <th className="px-3 py-2 text-right">Payé ce mois</th>
                     <th className="px-3 py-2 text-right">À payer</th>
                   </tr>
@@ -449,6 +418,13 @@ export default async function CaisseDashboardPage({
                       <td className="px-3 py-2 text-right font-mono text-zinc-900 dark:text-zinc-50">
                         {formatEuros(r.amendes_mois_centimes)}
                       </td>
+                      {ctx.caisse.cotisation_active && (
+                        <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
+                          {r.cotisation_mois_centimes > 0
+                            ? formatEuros(r.cotisation_mois_centimes)
+                            : "—"}
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
                         {formatEuros(r.paiements_mois_centimes)}
                       </td>
@@ -469,7 +445,7 @@ export default async function CaisseDashboardPage({
                 {totalAPayer > 0 && (
                   <tfoot>
                     <tr className="border-t border-zinc-200 bg-zinc-50 font-semibold dark:border-zinc-800 dark:bg-zinc-900">
-                      <td className="px-3 py-2" colSpan={4}>
+                      <td className="px-3 py-2" colSpan={ctx.caisse.cotisation_active ? 5 : 4}>
                         Total restant à payer
                       </td>
                       <td className="px-3 py-2 text-right font-mono text-red-600 dark:text-red-400">

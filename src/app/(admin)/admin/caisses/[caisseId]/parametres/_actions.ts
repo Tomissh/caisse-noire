@@ -3,6 +3,7 @@
 // Server Actions de l'écran Paramètres d'une caisse :
 //   - updateCaisseAction : modifie nom / description
 //   - regenerateCodeAction : génère un nouveau code unique
+//   - updateCotisationAction : paramètres de la cotisation mensuelle
 //   - addAdminAction : ajoute un admin par email (lookup auth.users via service-role)
 //   - removeAdminAction : retire un admin
 //
@@ -13,6 +14,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateCaisseCode, generatePassword } from "@/lib/caisse-code";
+import { eurosToCentimes } from "@/lib/format";
 import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 
 const uuid = z.uuid();
@@ -43,6 +45,47 @@ export async function updateCaisseAction(input: {
   const { error } = await supabase
     .from("caisses")
     .update({ nom: parsed.data.nom, description: parsed.data.description })
+    .eq("id", parsed.data.caisseId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/caisses/${parsed.data.caisseId}`, "layout");
+  return { ok: true };
+}
+
+const updateCotisationSchema = z
+  .object({
+    caisseId: uuid,
+    active: z.boolean(),
+    montantEuros: z.number().int().min(0).max(1_000),
+    plafonneeParAmendes: z.boolean(),
+    soldePrisEnCompte: z.boolean(),
+  })
+  .refine((v) => !v.active || v.montantEuros > 0, {
+    message: "Montant requis (> 0) si la cotisation est active",
+    path: ["montantEuros"],
+  });
+
+export async function updateCotisationAction(input: {
+  caisseId: string;
+  active: boolean;
+  montantEuros: number;
+  plafonneeParAmendes: boolean;
+  soldePrisEnCompte: boolean;
+}): Promise<Result> {
+  const parsed = updateCotisationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Champs invalides" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("caisses")
+    .update({
+      cotisation_active: parsed.data.active,
+      cotisation_montant_centimes: eurosToCentimes(parsed.data.montantEuros),
+      cotisation_plafonnee_par_amendes: parsed.data.plafonneeParAmendes,
+      cotisation_solde_pris_en_compte: parsed.data.soldePrisEnCompte,
+    })
     .eq("id", parsed.data.caisseId);
 
   if (error) return { ok: false, error: error.message };

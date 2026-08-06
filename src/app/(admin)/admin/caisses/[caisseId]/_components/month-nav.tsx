@@ -16,7 +16,7 @@ export function MonthNav({ mois, caisseId }: { mois: string; caisseId: string })
   const router = useRouter();
 
   const go = (target: string) => {
-    router.push(`/admin/caisses/${caisseId}?mois=${target}`);
+    router.push(`/admin/caisses/${caisseId}?mois=${target}`, { scroll: false });
   };
 
   return (

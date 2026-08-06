@@ -11,7 +11,9 @@ import { notFound } from "next/navigation";
 import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { centimesToEuros } from "@/lib/format";
 import { CaisseInfoForm } from "./_info-form";
+import { CotisationForm } from "./_cotisation";
 import { AdminsBlock } from "./_admins";
 import { DangerZone } from "./_danger-zone";
 
@@ -86,6 +88,14 @@ export default async function ParametresPage({
           <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Créateur</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">{createurEmail}</p>
         </section>
+
+        <CotisationForm
+          caisseId={caisseId}
+          active={caisse.cotisation_active}
+          montantEuros={centimesToEuros(caisse.cotisation_montant_centimes)}
+          plafonneeParAmendes={caisse.cotisation_plafonnee_par_amendes}
+          soldePrisEnCompte={caisse.cotisation_solde_pris_en_compte}
+        />
 
         <AdminsBlock
           caisseId={caisseId}

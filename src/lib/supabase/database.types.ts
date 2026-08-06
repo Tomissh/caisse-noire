@@ -232,6 +232,10 @@ export type Database = {
         Row: {
           cloturee_at: string | null
           code: string
+          cotisation_active: boolean
+          cotisation_montant_centimes: number
+          cotisation_plafonnee_par_amendes: boolean
+          cotisation_solde_pris_en_compte: boolean
           created_at: string
           createur_id: string
           description: string | null
@@ -242,6 +246,10 @@ export type Database = {
         Insert: {
           cloturee_at?: string | null
           code: string
+          cotisation_active?: boolean
+          cotisation_montant_centimes?: number
+          cotisation_plafonnee_par_amendes?: boolean
+          cotisation_solde_pris_en_compte?: boolean
           created_at?: string
           createur_id: string
           description?: string | null
@@ -252,6 +260,10 @@ export type Database = {
         Update: {
           cloturee_at?: string | null
           code?: string
+          cotisation_active?: boolean
+          cotisation_montant_centimes?: number
+          cotisation_plafonnee_par_amendes?: boolean
+          cotisation_solde_pris_en_compte?: boolean
           created_at?: string
           createur_id?: string
           description?: string | null
@@ -532,6 +544,7 @@ export type Database = {
           actif: boolean
           amendes_mois_centimes: number
           avance_centimes: number
+          cotisation_mois_centimes: number
           membre_id: string
           montant_a_payer_centimes: number
           nom: string

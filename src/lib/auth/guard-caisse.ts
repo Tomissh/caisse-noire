@@ -16,6 +16,10 @@ export type CaisseRow = {
   description: string | null;
   cloturee_at: string | null;
   createur_id: string;
+  cotisation_active: boolean;
+  cotisation_montant_centimes: number;
+  cotisation_plafonnee_par_amendes: boolean;
+  cotisation_solde_pris_en_compte: boolean;
 };
 
 export type CaisseAdminContext = {
@@ -33,7 +37,9 @@ export async function requireCaisseAdmin(caisseId: string): Promise<CaisseAdminC
 
   const { data: caisse } = await supabase
     .from("caisses")
-    .select("id, nom, code, description, cloturee_at, createur_id")
+    .select(
+      "id, nom, code, description, cloturee_at, createur_id, cotisation_active, cotisation_montant_centimes, cotisation_plafonnee_par_amendes, cotisation_solde_pris_en_compte",
+    )
     .eq("id", caisseId)
     .maybeSingle();
 
