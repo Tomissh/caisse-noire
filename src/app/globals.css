@@ -128,3 +128,14 @@
     @apply font-sans;
   }
 }
+
+/* Hors @layer (priorité max) : les champs de formulaire sont en text-sm
+   (14px) partout dans l'app, en dessous du seuil de 16px qui déclenche le
+   zoom automatique au focus sur iOS Safari. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMembreAuth } from "@/lib/auth/membre-context";
+import { AvatarUploader } from "./avatar-uploader";
 
 export function MembreTopbar() {
   const { signOut, claims } = useMembreAuth();
@@ -9,9 +10,12 @@ export function MembreTopbar() {
 
   return (
     <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <Link href="/membre" className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-        Caisse Noire — Membre
-      </Link>
+      <div className="flex items-center gap-3">
+        <AvatarUploader size={32} />
+        <Link href="/membre" className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Caisse Noire — Membre
+        </Link>
+      </div>
       <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
         <span className="hidden sm:inline">
           Session jusqu&apos;au{" "}

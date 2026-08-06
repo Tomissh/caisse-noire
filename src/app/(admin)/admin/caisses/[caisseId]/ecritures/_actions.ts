@@ -2,9 +2,11 @@
 
 // Server Actions des écritures (amendes / paiements / retraits) + soft-delete.
 //
-// - declareAmendeAction : 1 ou N membres en une seule transaction (insert batch).
-//   Le `motif_id` peut être null (saisie libre). Le libellé est toujours stocké
-//   (copie du catalogue pour conservation après suppression du motif).
+// - declareAmendesBatchAction : N amendes hétérogènes (membre/motif/montant
+//   propres à chacune) en une seule transaction (insert batch), pour la
+//   saisie multi-lignes du formulaire. Le `motif_id` peut être null (saisie
+//   libre). Le libellé est toujours stocké (copie du catalogue pour
+//   conservation après suppression du motif).
 // - recordPaiementAction : montant positif uniquement, moyen ∈ enum.
 // - recordRetraitAction : montant euros signé (positif = sortie, négatif =
 //   correction). 0 interdit.
@@ -25,24 +27,30 @@ type Result = { ok: true; count?: number } | { ok: false; error: string };
 // Amendes
 // ---------------------------------------------------------------------------
 
-const declareAmendeSchema = z
+const amendeRowSchema = z.object({
+  motifId: uuid.nullable(),
+  libelle: z.string().trim().min(1, "Libellé requis").max(120),
+  montantEuros: z.number().int().positive().max(10_000),
+  membreId: uuid,
+});
+
+const declareAmendesBatchSchema = z
   .object({
     caisseId: uuid,
-    motifId: uuid.nullable(),
-    libelle: z.string().trim().min(1, "Libellé requis").max(120),
-    montantEuros: z.number().int().positive().max(10_000),
-    membreIds: z.array(uuid).min(1, "Sélectionnez au moins un membre"),
+    rows: z.array(amendeRowSchema).min(1, "Ajoutez au moins une amende").max(50),
   })
   .strict();
 
-export async function declareAmendeAction(input: {
+export async function declareAmendesBatchAction(input: {
   caisseId: string;
-  motifId: string | null;
-  libelle: string;
-  montantEuros: number;
-  membreIds: string[];
+  rows: {
+    motifId: string | null;
+    libelle: string;
+    montantEuros: number;
+    membreId: string;
+  }[];
 }): Promise<Result> {
-  const parsed = declareAmendeSchema.safeParse(input);
+  const parsed = declareAmendesBatchSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Champs invalides" };
   }
@@ -53,13 +61,12 @@ export async function declareAmendeAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Non authentifié" };
 
-  const centimes = eurosToCentimes(parsed.data.montantEuros);
-  const rows = parsed.data.membreIds.map((membreId) => ({
+  const rows = parsed.data.rows.map((r) => ({
     caisse_id: parsed.data.caisseId,
-    membre_id: membreId,
-    motif_id: parsed.data.motifId,
-    libelle: parsed.data.libelle,
-    montant_centimes: centimes,
+    membre_id: r.membreId,
+    motif_id: r.motifId,
+    libelle: r.libelle,
+    montant_centimes: eurosToCentimes(r.montantEuros),
     declaree_par_user_id: user.id,
   }));
 

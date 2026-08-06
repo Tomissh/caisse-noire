@@ -1,24 +1,33 @@
 "use client";
 
-// Formulaire de saisie d'une amende.
+// Formulaire de saisie d'amendes — plusieurs lignes en une fois.
 //
-//   - Mode : "single" (1 membre) ou "multi" (N membres, même montant).
+//   - Chaque ligne = 1 amende (membre + motif + libellé + montant).
+//   - "+ Ajouter une amende" empile une nouvelle ligne vide en dessous,
+//     sans rien enregistrer — tout est validé ensemble à la fin, en un
+//     seul aller-retour serveur (declareAmendesBatchAction).
+//   - Par ligne, membre au-dessus du motif.
 //   - Motif : sélecteur catalogue + option "Saisie libre".
 //       * Motif `montant_variable = false` → libellé + montant pré-remplis
 //         et verrouillés.
 //       * Motif `montant_variable = true`  → libellé + montant pré-remplis
 //         mais éditables.
 //       * Saisie libre → libellé + montant vides, à saisir.
-//   - Toggle "Saisir une autre amende" : conserve les valeurs du form après
-//     succès (utile pendant un événement).
 
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo } from "react";
+import {
+  useFieldArray,
+  useForm,
+  useWatch,
+  type Control,
+  type UseFormRegister,
+  type UseFormSetValue,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { declareAmendeAction } from "../../_actions";
+import { declareAmendesBatchAction } from "../../_actions";
 
 const FREE = "__free__" as const;
 
@@ -31,33 +40,21 @@ type MotifOption = {
 
 type MembreOption = { id: string; prenom: string; nom: string };
 
-const schema = z
-  .object({
-    mode: z.enum(["single", "multi"]),
-    motifSelection: z.string(), // motifId ou FREE
-    libelle: z.string().trim().min(1, "Libellé requis").max(120),
-    montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
-    membreId: z.string().optional(),
-    membreIds: z.array(z.string()).optional(),
-    keepOpen: z.boolean(),
-  })
-  .superRefine((val, ctx) => {
-    if (val.mode === "single" && (!val.membreId || val.membreId === "")) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["membreId"],
-        message: "Sélectionnez un membre",
-      });
-    }
-    if (val.mode === "multi" && (!val.membreIds || val.membreIds.length === 0)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["membreIds"],
-        message: "Sélectionnez au moins un membre",
-      });
-    }
-  });
+const rowSchema = z.object({
+  membreId: z.string().min(1, "Sélectionnez un membre"),
+  motifSelection: z.string(), // motifId ou FREE
+  libelle: z.string().trim().min(1, "Libellé requis").max(120),
+  montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
+});
+
+const schema = z.object({
+  rows: z.array(rowSchema).min(1),
+});
 type FormValues = z.infer<typeof schema>;
+
+function emptyRow(): FormValues["rows"][number] {
+  return { membreId: "", motifSelection: FREE, libelle: "", montantEuros: 5 };
+}
 
 export function AmendeForm({
   caisseId,
@@ -69,30 +66,117 @@ export function AmendeForm({
   membres: MembreOption[];
 }) {
   const router = useRouter();
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
+    control,
     register,
     handleSubmit,
-    watch,
     setValue,
-    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      mode: "single",
-      motifSelection: FREE,
-      libelle: "",
-      montantEuros: 5,
-      membreId: "",
-      membreIds: [],
-      keepOpen: false,
-    },
+    defaultValues: { rows: [emptyRow()] },
   });
 
-  const motifSelection = watch("motifSelection");
-  const mode = watch("mode");
+  const { fields, append, remove } = useFieldArray({ control, name: "rows" });
+
+  const onSubmit = async (values: FormValues) => {
+    const rows = values.rows.map((r) => ({
+      motifId: r.motifSelection === FREE ? null : r.motifSelection,
+      libelle: r.libelle,
+      montantEuros: r.montantEuros,
+      membreId: r.membreId,
+    }));
+
+    const res = await declareAmendesBatchAction({ caisseId, rows });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    const n = res.count ?? rows.length;
+    toast.success(n > 1 ? `${n} amendes déclarées` : "Amende déclarée");
+    router.replace(`/admin/caisses/${caisseId}/ecritures`);
+    router.refresh();
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <div className="space-y-4">
+        {fields.map((field, index) => (
+          <AmendeRowFields
+            key={field.id}
+            index={index}
+            control={control}
+            register={register}
+            setValue={setValue}
+            motifs={motifs}
+            membres={membres}
+            errors={errors.rows?.[index]}
+            onRemove={() => remove(index)}
+            canRemove={fields.length > 1}
+          />
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => append(emptyRow())}
+        className="w-full rounded-md border border-dashed border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+      >
+        + Ajouter une amende
+      </button>
+
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          Annuler
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+        >
+          {isSubmitting
+            ? "Enregistrement…"
+            : fields.length > 1
+              ? `Déclarer les ${fields.length} amendes`
+              : "Déclarer"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function AmendeRowFields({
+  index,
+  control,
+  register,
+  setValue,
+  motifs,
+  membres,
+  errors,
+  onRemove,
+  canRemove,
+}: {
+  index: number;
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+  setValue: UseFormSetValue<FormValues>;
+  motifs: MotifOption[];
+  membres: MembreOption[];
+  errors?: {
+    membreId?: { message?: string };
+    motifSelection?: { message?: string };
+    libelle?: { message?: string };
+    montantEuros?: { message?: string };
+  };
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const motifSelection = useWatch({ control, name: `rows.${index}.motifSelection` });
 
   const selectedMotif = useMemo<MotifOption | null>(() => {
     if (motifSelection === FREE) return null;
@@ -101,88 +185,61 @@ export function AmendeForm({
 
   const locked = selectedMotif !== null && !selectedMotif.montantVariable;
 
-  // À chaque changement de motif sélectionné, repropage libellé + montant.
+  // À chaque changement de motif sélectionné sur cette ligne, repropage
+  // libellé + montant.
   useEffect(() => {
     if (selectedMotif) {
-      setValue("libelle", selectedMotif.libelle, { shouldValidate: false });
-      setValue("montantEuros", selectedMotif.montantEuros, { shouldValidate: false });
+      setValue(`rows.${index}.libelle`, selectedMotif.libelle, { shouldValidate: false });
+      setValue(`rows.${index}.montantEuros`, selectedMotif.montantEuros, { shouldValidate: false });
     } else {
-      // Saisie libre : vide les champs
-      setValue("libelle", "", { shouldValidate: false });
-      setValue("montantEuros", 5, { shouldValidate: false });
+      setValue(`rows.${index}.libelle`, "", { shouldValidate: false });
+      setValue(`rows.${index}.montantEuros`, 5, { shouldValidate: false });
     }
-  }, [selectedMotif, setValue]);
-
-  const onSubmit = async (values: FormValues) => {
-    setServerError(null);
-    const motifId = values.motifSelection === FREE ? null : values.motifSelection;
-    const membreIds =
-      values.mode === "single"
-        ? values.membreId
-          ? [values.membreId]
-          : []
-        : values.membreIds ?? [];
-
-    const res = await declareAmendeAction({
-      caisseId,
-      motifId,
-      libelle: values.libelle,
-      montantEuros: values.montantEuros,
-      membreIds,
-    });
-    if (!res.ok) {
-      setServerError(res.error);
-      toast.error(res.error);
-      return;
-    }
-    const n = res.count ?? membreIds.length;
-    toast.success(n > 1 ? `${n} amendes déclarées` : "Amende déclarée");
-    if (values.keepOpen) {
-      reset({
-        mode: values.mode,
-        motifSelection: values.motifSelection,
-        libelle: values.libelle,
-        montantEuros: values.montantEuros,
-        membreId: "",
-        membreIds: [],
-        keepOpen: true,
-      });
-      router.refresh();
-    } else {
-      router.replace(`/admin/caisses/${caisseId}/ecritures`);
-      router.refresh();
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMotif, index]);
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-5 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-      noValidate
-    >
-      {/* Mode --------------------------------------------------------- */}
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-          Destinataires
-        </legend>
-        <div className="flex gap-3 text-sm">
-          <label className="flex items-center gap-1.5">
-            <input type="radio" value="single" {...register("mode")} className="size-4" />
-            <span>Une personne</span>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="radio" value="multi" {...register("mode")} className="size-4" />
-            <span>Plusieurs personnes (même montant)</span>
-          </label>
-        </div>
-      </fieldset>
+    <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Amende {index + 1}
+        </span>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-red-600 underline-offset-2 hover:underline dark:text-red-400"
+          >
+            Retirer
+          </button>
+        )}
+      </div>
+
+      {/* Membre -------------------------------------------------------- */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Membre</label>
+        <select
+          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+          {...register(`rows.${index}.membreId`)}
+        >
+          <option value="">— Choisir —</option>
+          {membres.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.prenom} {m.nom}
+            </option>
+          ))}
+        </select>
+        {errors?.membreId && (
+          <p className="text-xs text-red-600 dark:text-red-400">{errors.membreId.message}</p>
+        )}
+      </div>
 
       {/* Motif -------------------------------------------------------- */}
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Motif</label>
         <select
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-          {...register("motifSelection")}
+          {...register(`rows.${index}.motifSelection`)}
         >
           <option value={FREE}>Saisie libre</option>
           {motifs.map((m) => (
@@ -207,9 +264,9 @@ export function AmendeForm({
             className={`w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 ${
               locked ? "cursor-not-allowed bg-zinc-50 dark:bg-zinc-900" : ""
             }`}
-            {...register("libelle")}
+            {...register(`rows.${index}.libelle`)}
           />
-          {errors.libelle && (
+          {errors?.libelle && (
             <p className="text-xs text-red-600 dark:text-red-400">{errors.libelle.message}</p>
           )}
         </div>
@@ -223,93 +280,13 @@ export function AmendeForm({
             className={`w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 ${
               locked ? "cursor-not-allowed bg-zinc-50 dark:bg-zinc-900" : ""
             }`}
-            {...register("montantEuros", { valueAsNumber: true })}
+            {...register(`rows.${index}.montantEuros`, { valueAsNumber: true })}
           />
-          {errors.montantEuros && (
+          {errors?.montantEuros && (
             <p className="text-xs text-red-600 dark:text-red-400">{errors.montantEuros.message}</p>
           )}
         </div>
       </div>
-
-      {/* Membres ------------------------------------------------------ */}
-      {mode === "single" ? (
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Membre</label>
-          <select
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-            {...register("membreId")}
-          >
-            <option value="">— Choisir —</option>
-            {membres.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.prenom} {m.nom}
-              </option>
-            ))}
-          </select>
-          {errors.membreId && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.membreId.message}</p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-            Membres concernés
-          </label>
-          <div className="max-h-56 overflow-auto rounded-md border border-zinc-300 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-950">
-            {membres.map((m) => (
-              <label
-                key={m.id}
-                className="flex items-center gap-2 rounded px-2 py-1 text-sm text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              >
-                <input
-                  type="checkbox"
-                  value={m.id}
-                  className="size-4 rounded border-zinc-300 dark:border-zinc-700"
-                  {...register("membreIds")}
-                />
-                <span>
-                  {m.prenom} {m.nom}
-                </span>
-              </label>
-            ))}
-          </div>
-          {errors.membreIds && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.membreIds.message}</p>
-          )}
-        </div>
-      )}
-
-      <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
-        <input
-          type="checkbox"
-          className="size-4 rounded border-zinc-300 dark:border-zinc-700"
-          {...register("keepOpen")}
-        />
-        Saisir une autre amende après celle-ci
-      </label>
-
-      {serverError && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          {serverError}
-        </p>
-      )}
-
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-        >
-          Annuler
-        </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-        >
-          {isSubmitting ? "Enregistrement…" : "Déclarer"}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 }

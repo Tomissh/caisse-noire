@@ -5,9 +5,11 @@
 //
 // Actions rapides : nouvelle amende / nouveau paiement / nouveau retrait.
 //
-// Podium des plus gros payeurs : top 3 par paiements_mois_centimes du mois
-// calendaire en cours (indépendant du mois navigué dans le récap
-// ci-dessous) — RPC situation_caisse_mois.
+// Podium des plus gros payeurs : top 3 par somme des paiements du mois
+// calendaire en cours (dates brutes, requête directe sur `paiements` —
+// indépendant du mois navigué dans le récap ci-dessous et du décalage de
+// 7 j appliqué par situation_caisse_mois pour le rattachement des paiements
+// au mois des amendes qu'ils soldent).
 //
 // Récapitulatif mensuel : ce que chaque membre doit encore payer pour un
 // mois donné, en tenant compte de son solde reporté (avance/retard) —
@@ -38,9 +40,16 @@ function currentMonthDefault(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-function currentCalendarMonth(): string {
+// Bornes [début, fin) du mois calendaire en cours, en UTC. Utilisées pour le
+// podium des plus gros payeurs : contrairement au récapitulatif mensuel, ce
+// classement porte sur les paiements réellement encaissés ce mois-ci (dates
+// brutes, sans le décalage de 7 j appliqué par situation_caisse_mois pour
+// rattacher un paiement au mois des amendes qu'il solde).
+function currentCalendarMonthBounds(): { debut: string; fin: string } {
   const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const debut = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const fin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { debut: debut.toISOString(), fin: fin.toISOString() };
 }
 
 function moisLabel(mois: string): string {
@@ -63,6 +72,7 @@ export default async function CaisseDashboardPage({
   const supabase = await createClient();
 
   const mois = /^\d{4}-\d{2}$/.test(moisParam ?? "") ? moisParam! : currentMonthDefault();
+  const { debut: moisEnCoursDebut, fin: moisEnCoursFin } = currentCalendarMonthBounds();
 
   const [
     soldeRes,
@@ -89,10 +99,13 @@ export default async function CaisseDashboardPage({
       .select("membre_id, solde_centimes")
       .eq("caisse_id", caisseId),
     supabase.rpc("situation_caisse_mois", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
-    supabase.rpc("situation_caisse_mois", {
-      p_caisse_id: caisseId,
-      p_mois: `${currentCalendarMonth()}-01`,
-    }),
+    supabase
+      .from("paiements")
+      .select("membre_id, montant_centimes, membres(prenom, nom)")
+      .eq("caisse_id", caisseId)
+      .is("supprimee_at", null)
+      .gte("created_at", moisEnCoursDebut)
+      .lt("created_at", moisEnCoursFin),
     supabase
       .from("amendes")
       .select(
@@ -129,10 +142,25 @@ export default async function CaisseDashboardPage({
   );
   const soldePhysique = soldeRes.data?.solde_centimes ?? totalPaiements - totalRetraits;
 
-  // Podium des plus gros payeurs du mois calendaire en cours (indépendant
-  // du mois navigué dans le récapitulatif ci-dessous).
-  const topPayeurs = [...(topPayeursRes.data ?? [])]
-    .filter((r) => r.paiements_mois_centimes > 0)
+  // Podium des plus gros payeurs du mois calendaire en cours (paiements
+  // agrégés par membre, dates brutes — indépendant du mois navigué dans le
+  // récapitulatif ci-dessous et du décalage de 7 j de situation_caisse_mois).
+  const topPayeursByMembreId = new Map<string, { prenom: string; nom: string; total: number }>();
+  for (const p of topPayeursRes.data ?? []) {
+    if (!p.membre_id) continue;
+    const m = (p.membres as unknown as { prenom: string; nom: string } | null) ?? null;
+    if (!m) continue;
+    const entry = topPayeursByMembreId.get(p.membre_id) ?? { prenom: m.prenom, nom: m.nom, total: 0 };
+    entry.total += p.montant_centimes;
+    topPayeursByMembreId.set(p.membre_id, entry);
+  }
+  const topPayeurs = [...topPayeursByMembreId.entries()]
+    .map(([membreId, v]) => ({
+      membre_id: membreId,
+      prenom: v.prenom,
+      nom: v.nom,
+      paiements_mois_centimes: v.total,
+    }))
     .sort((a, b) => b.paiements_mois_centimes - a.paiements_mois_centimes)
     .slice(0, 3);
 
