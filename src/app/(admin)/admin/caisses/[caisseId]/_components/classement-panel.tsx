@@ -1,8 +1,9 @@
 "use client";
 
-// Classement des membres qui doivent encore payer pour le mois affiché,
-// copiable en un clic dans le presse-papier pour être collé dans un
-// message (WhatsApp, SMS...). Podium avec médailles pour le top 3.
+// Classement de tous les membres pour le mois affiché, trié par montant
+// restant à payer décroissant, copiable en un clic dans le presse-papier
+// pour être collé dans un message (WhatsApp, SMS...). Médailles pour le
+// top 3, "0€" pour les membres à jour.
 
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,10 +24,9 @@ function formatLine(row: ClassementRow, index: number): string {
 
 export function ClassementPanel({ rows }: { rows: ClassementRow[] }) {
   const [open, setOpen] = useState(false);
-  const debiteurs = rows.filter((r) => r.montantAPayerCentimes > 0);
 
   const onCopy = async () => {
-    const text = debiteurs.map(formatLine).join("\n");
+    const text = rows.map(formatLine).join("\n");
     try {
       await navigator.clipboard.writeText(text);
       toast.success("Classement copié");
@@ -47,14 +47,12 @@ export function ClassementPanel({ rows }: { rows: ClassementRow[] }) {
 
       {open && (
         <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          {debiteurs.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Tout le monde est à jour — rien à réclamer ce mois-ci.
-            </p>
+          {rows.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Aucun membre.</p>
           ) : (
             <>
               <ol className="space-y-1 font-mono text-sm text-zinc-900 dark:text-zinc-50">
-                {debiteurs.map((r, i) => (
+                {rows.map((r, i) => (
                   <li key={`${r.prenom}-${r.nom}-${i}`}>{formatLine(r, i)}</li>
                 ))}
               </ol>

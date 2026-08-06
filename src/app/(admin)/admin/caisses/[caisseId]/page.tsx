@@ -1,13 +1,13 @@
 // Dashboard d'une caisse — Phase 4.C.
 //
-// KPIs (5 cards) :
-//   - Solde physique (paiements − retraits) via v_caisse_solde
-//   - Total amendes actives
-//   - Total paiements actifs
-//   - Total retraits (signe absolu = somme nette)
-//   - Nombre de membres actifs
+// Total de la caisse : solde physique (paiements − retraits) via
+// v_caisse_solde, seul chiffre mis en avant en haut du dashboard.
 //
 // Actions rapides : nouvelle amende / nouveau paiement / nouveau retrait.
+//
+// Podium des plus gros payeurs : top 3 par paiements_mois_centimes du mois
+// calendaire en cours (indépendant du mois navigué dans le récap
+// ci-dessous) — RPC situation_caisse_mois.
 //
 // Récapitulatif mensuel : ce que chaque membre doit encore payer pour un
 // mois donné, en tenant compte de son solde reporté (avance/retard) —
@@ -38,6 +38,11 @@ function currentMonthDefault(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function currentCalendarMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 function moisLabel(mois: string): string {
   const [y, m] = mois.split("-").map(Number);
   const d = new Date(Date.UTC(y ?? 2026, (m ?? 1) - 1, 1));
@@ -61,40 +66,33 @@ export default async function CaisseDashboardPage({
 
   const [
     soldeRes,
-    amendesSumRes,
     paiementsSumRes,
     retraitsSumRes,
-    membresActifsRes,
     membresRes,
     situationsRes,
     recapMoisRes,
+    topPayeursRes,
     amendesLastRes,
     paiementsLastRes,
     retraitsLastRes,
   ] = await Promise.all([
     supabase.from("v_caisse_solde").select("*").eq("caisse_id", caisseId).maybeSingle(),
     supabase
-      .from("amendes")
-      .select("montant_centimes")
-      .eq("caisse_id", caisseId)
-      .is("supprimee_at", null),
-    supabase
       .from("paiements")
       .select("montant_centimes")
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null),
     supabase.from("retraits").select("montant_centimes").eq("caisse_id", caisseId),
-    supabase
-      .from("membres")
-      .select("id", { count: "exact", head: true })
-      .eq("caisse_id", caisseId)
-      .eq("actif", true),
     supabase.from("membres").select("id, prenom, nom, actif").eq("caisse_id", caisseId),
     supabase
       .from("v_membre_situation")
       .select("membre_id, solde_centimes")
       .eq("caisse_id", caisseId),
     supabase.rpc("situation_caisse_mois", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
+    supabase.rpc("situation_caisse_mois", {
+      p_caisse_id: caisseId,
+      p_mois: `${currentCalendarMonth()}-01`,
+    }),
     supabase
       .from("amendes")
       .select(
@@ -121,7 +119,6 @@ export default async function CaisseDashboardPage({
       .limit(5),
   ]);
 
-  const totalAmendes = (amendesSumRes.data ?? []).reduce((s, r) => s + r.montant_centimes, 0);
   const totalPaiements = (paiementsSumRes.data ?? []).reduce(
     (s, r) => s + r.montant_centimes,
     0,
@@ -131,7 +128,13 @@ export default async function CaisseDashboardPage({
     0,
   );
   const soldePhysique = soldeRes.data?.solde_centimes ?? totalPaiements - totalRetraits;
-  const nbMembresActifs = membresActifsRes.count ?? 0;
+
+  // Podium des plus gros payeurs du mois calendaire en cours (indépendant
+  // du mois navigué dans le récapitulatif ci-dessous).
+  const topPayeurs = [...(topPayeursRes.data ?? [])]
+    .filter((r) => r.paiements_mois_centimes > 0)
+    .sort((a, b) => b.paiements_mois_centimes - a.paiements_mois_centimes)
+    .slice(0, 3);
 
   // Soldes par membre : deux requêtes séparées (membres + v_membre_situation)
   // fusionnées côté client, plutôt qu'un embed PostgREST qui échoue silen-
@@ -268,13 +271,28 @@ export default async function CaisseDashboardPage({
           </div>
         </header>
 
-        {/* KPI cards ---------------------------------------------------- */}
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <KpiCard label="Solde caisse" value={formatSolde(soldePhysique)} accent="strong" />
-          <KpiCard label="Total amendes" value={formatEuros(totalAmendes)} accent="red" />
-          <KpiCard label="Total paiements" value={formatEuros(totalPaiements)} accent="green" />
-          <KpiCard label="Total retraits" value={formatEuros(totalRetraits)} accent="orange" />
-          <KpiCard label="Membres actifs" value={String(nbMembresActifs)} />
+        {/* Total de la caisse -------------------------------------------- */}
+        <section className="rounded-lg border border-zinc-200 bg-white px-6 py-5 text-center dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Total de la caisse
+          </div>
+          <div className="mt-1 font-mono text-4xl font-bold text-zinc-900 dark:text-zinc-50">
+            {formatSolde(soldePhysique)}
+          </div>
+        </section>
+
+        {/* Podium des plus gros payeurs du mois --------------------------- */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+            Plus gros payeurs du mois
+          </h2>
+          {topPayeurs.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+              Aucun paiement ce mois-ci.
+            </p>
+          ) : (
+            <PodiumPayeurs rows={topPayeurs} />
+          )}
         </section>
 
         {/* Récapitulatif mensuel ----------------------------------------- */}
@@ -340,17 +358,15 @@ export default async function CaisseDashboardPage({
                         {formatEuros(r.paiements_mois_centimes)}
                       </td>
                       <td className="px-3 py-2 text-right font-mono font-semibold">
-                        {r.montant_a_payer_centimes > 0 ? (
-                          <span className="text-red-600 dark:text-red-400">
-                            {formatEuros(r.montant_a_payer_centimes)}
-                          </span>
-                        ) : r.avance_centimes > 0 ? (
-                          <span className="text-emerald-600 dark:text-emerald-400">
-                            à jour (+{formatEuros(r.avance_centimes)})
-                          </span>
-                        ) : (
-                          <span className="text-zinc-500">à jour</span>
-                        )}
+                        <span
+                          className={
+                            r.montant_a_payer_centimes > 0
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-zinc-500"
+                          }
+                        >
+                          {formatEuros(r.montant_a_payer_centimes)}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -449,28 +465,55 @@ export default async function CaisseDashboardPage({
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: "strong" | "red" | "green" | "orange";
-}) {
-  const valueClass = {
-    strong: "text-zinc-900 dark:text-zinc-50",
-    red: "text-red-600 dark:text-red-400",
-    green: "text-emerald-600 dark:text-emerald-400",
-    orange: "text-orange-600 dark:text-orange-400",
-  }[accent ?? "strong"];
+type PayeurRow = { membre_id: string; prenom: string; nom: string; paiements_mois_centimes: number };
 
+// Podium visuel : 2e à gauche, 1er au centre (plus grand), 3e à droite
+// (plus petit) — cf. maquette fournie.
+const PODIUM_SLOTS: {
+  rank: 0 | 1 | 2;
+  medal: string;
+  circle: string;
+  ring: string;
+}[] = [
+  {
+    rank: 1,
+    medal: "🥈",
+    circle: "h-24 w-24 text-sm",
+    ring: "border-zinc-300 dark:border-zinc-500",
+  },
+  {
+    rank: 0,
+    medal: "🥇",
+    circle: "h-28 w-28 text-base",
+    ring: "border-amber-400 dark:border-amber-500",
+  },
+  {
+    rank: 2,
+    medal: "🥉",
+    circle: "h-20 w-20 text-sm",
+    ring: "border-orange-700/70 dark:border-orange-600/70",
+  },
+];
+
+function PodiumPayeurs({ rows }: { rows: PayeurRow[] }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-        {label}
-      </div>
-      <div className={`mt-1 font-mono text-lg font-semibold ${valueClass}`}>{value}</div>
+    <div className="flex items-end justify-center gap-6 rounded-lg border border-zinc-200 bg-white px-6 py-8 dark:border-zinc-800 dark:bg-zinc-900">
+      {PODIUM_SLOTS.map((slot) => {
+        const r = rows[slot.rank];
+        if (!r) return null;
+        return (
+          <div key={r.membre_id} className="flex flex-col items-center gap-2">
+            <div
+              className={`flex items-center justify-center rounded-full border-4 bg-zinc-50 font-mono font-bold text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 ${slot.circle} ${slot.ring}`}
+            >
+              {Math.round(r.paiements_mois_centimes / 100)}€
+            </div>
+            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {slot.medal} {r.prenom}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
