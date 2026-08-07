@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { addAdminAction, removeAdminAction } from "./_actions";
+import { addAdminAction, removeAdminAction, resetAdminPasswordAction } from "./_actions";
 
 const NONE = "__none__" as const;
 
@@ -26,16 +26,22 @@ export function AdminsBlock({
   admins,
   membresDisponibles,
   canManage,
+  isSuperAdmin,
 }: {
   caisseId: string;
   admins: { userId: string; email: string; membreNom: string | null }[];
   membresDisponibles: { id: string; nom: string }[];
   canManage: boolean;
+  isSuperAdmin: boolean;
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [resetPending, setResetPending] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(
+    null,
+  );
   const {
     register,
     handleSubmit,
@@ -49,6 +55,7 @@ export function AdminsBlock({
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     setCreated(null);
+    setResetResult(null);
     const res = await addAdminAction({
       caisseId,
       email: values.email,
@@ -80,6 +87,20 @@ export function AdminsBlock({
       toast.success("Admin retiré");
       router.refresh();
     });
+  };
+
+  const onResetPassword = async (userId: string, email: string) => {
+    if (!confirm(`Réinitialiser le mot de passe de ${email} ?`)) return;
+    setResetPending(userId);
+    const res = await resetAdminPasswordAction({ caisseId, userId });
+    setResetPending(null);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setCreated(null);
+    setResetResult({ email, password: res.password });
+    toast.success("Mot de passe réinitialisé");
   };
 
   return (
@@ -122,6 +143,33 @@ export function AdminsBlock({
         </div>
       )}
 
+      {resetResult && (
+        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+            Mot de passe réinitialisé — note-le, il n&apos;apparaîtra plus.
+          </p>
+          <dl className="space-y-1 text-sm">
+            <div>
+              <dt className="text-xs font-medium text-emerald-800 dark:text-emerald-300">Email</dt>
+              <dd className="font-mono text-zinc-900 dark:text-zinc-50">{resetResult.email}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                Nouveau mot de passe
+              </dt>
+              <dd className="font-mono text-zinc-900 dark:text-zinc-50">{resetResult.password}</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            onClick={() => setResetResult(null)}
+            className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+          >
+            OK, noté
+          </button>
+        </div>
+      )}
+
       {admins.length === 0 ? (
         <p className="text-xs text-zinc-500 dark:text-zinc-400">Aucun admin additionnel.</p>
       ) : (
@@ -136,16 +184,28 @@ export function AdminsBlock({
                   </span>
                 )}
               </span>
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(a.userId)}
-                  disabled={pending}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Retirer
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => onResetPassword(a.userId, a.email)}
+                    disabled={resetPending === a.userId}
+                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    {resetPending === a.userId ? "…" : "Réinitialiser le mot de passe"}
+                  </button>
+                )}
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(a.userId)}
+                    disabled={pending}
+                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

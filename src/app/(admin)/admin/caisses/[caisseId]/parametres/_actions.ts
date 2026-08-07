@@ -186,6 +186,43 @@ export async function addAdminAction(input: {
   return password ? { ok: true, password } : { ok: true };
 }
 
+const resetAdminPasswordSchema = z.object({ caisseId: uuid, userId: uuid });
+
+type ResetPasswordResult = { ok: true; password: string } | { ok: false; error: string };
+
+// Réinitialise le mot de passe d'un admin de la caisse — super-admin
+// uniquement. updateUserById bypasse la RLS (service-role) : le rôle est
+// vérifié explicitement avant, même raisonnement que addAdminAction pour
+// createUser.
+export async function resetAdminPasswordAction(input: {
+  caisseId: string;
+  userId: string;
+}): Promise<ResetPasswordResult> {
+  const parsed = resetAdminPasswordSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Paramètres invalides" };
+
+  const ctx = await requireCaisseAdmin(parsed.data.caisseId);
+  if (ctx.role !== "super_admin") {
+    return { ok: false, error: "Seul un super-admin peut réinitialiser ce mot de passe" };
+  }
+
+  const supabase = await createClient();
+  const { data: adminRow } = await supabase
+    .from("admins_caisse")
+    .select("user_id")
+    .eq("caisse_id", parsed.data.caisseId)
+    .eq("user_id", parsed.data.userId)
+    .maybeSingle();
+  if (!adminRow) return { ok: false, error: "Cet utilisateur n'est pas admin de cette caisse" };
+
+  const password = generatePassword(16);
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, { password });
+  if (error) return { ok: false, error: error.message };
+
+  return { ok: true, password };
+}
+
 const removeAdminSchema = z.object({ caisseId: uuid, userId: uuid });
 
 export async function removeAdminAction(input: {

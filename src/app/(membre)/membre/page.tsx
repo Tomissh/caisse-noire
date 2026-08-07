@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useMembreAuth } from "@/lib/auth/membre-context";
 import { formatEuros, formatSolde } from "@/lib/format";
 import { PodiumPayeurs, type PayeurRow } from "@/components/features/PodiumPayeurs";
+import { Avatar } from "@/components/features/Avatar";
 
 type Situation = {
   membre_id: string | null;
@@ -58,6 +59,7 @@ type Data = {
   monTotalPaiements: number;
   soldeCaisse: number;
   situations: Situation[];
+  avatarUrlByMembreId: Map<string, string>;
   podiumDettes: PayeurRow[];
   amendes: Amende[];
   paiements: Paiement[];
@@ -175,27 +177,40 @@ export default function MembreDashboardPage() {
         });
 
         const mySit = situations.find((s) => s.membre_id === claims.membre_id);
+        const membresActifs = situations.filter((s) => s.actif);
+
+        // Photos de profil : une seule requête groupée (bucket privé
+        // "avatars") pour tous les membres actifs — réutilisée par le
+        // podium (top 3) et par "Toutes les dettes" — retombe sur l'avatar
+        // par défaut si absente/en erreur.
+        const { data: avatarSignedUrls } =
+          membresActifs.length > 0
+            ? await supabase.storage
+                .from("avatars")
+                .createSignedUrls(
+                  membresActifs.map((s) => `${claims.caisse_id}/${s.membre_id}/avatar`),
+                  3600,
+                )
+            : { data: [] as { path: string | null; signedUrl: string | null }[] };
+        const avatarUrlByMembreId = new Map<string, string>();
+        for (const r of avatarSignedUrls ?? []) {
+          if (!r.path || !r.signedUrl) continue;
+          const membreId = r.path.split("/")[1];
+          if (membreId) avatarUrlByMembreId.set(membreId, r.signedUrl);
+        }
 
         // Podium des dettes : top 3 des soldes les plus bas — même calcul
         // que le dashboard admin. Membres désactivés exclus (visibles
         // uniquement dans la page de gestion des membres, côté admin).
-        const podiumDettesSansPhoto = situations
-          .filter((s) => s.actif)
+        const podiumDettes: PayeurRow[] = [...membresActifs]
           .sort((a, b) => (a.solde_centimes ?? 0) - (b.solde_centimes ?? 0))
           .slice(0, 3)
-          .map((s) => ({ id: s.membre_id!, nom: s.nom, montantCentimes: s.solde_centimes ?? 0 }));
-
-        // Photo de profil du podium : URL signée (bucket privé "avatars"),
-        // même logique que le dashboard admin — retombe sur l'avatar par
-        // défaut si absente.
-        const podiumDettes: PayeurRow[] = await Promise.all(
-          podiumDettesSansPhoto.map(async (p) => {
-            const { data } = await supabase.storage
-              .from("avatars")
-              .createSignedUrl(`${claims.caisse_id}/${p.id}/avatar`, 3600);
-            return { ...p, avatarUrl: data?.signedUrl ?? null };
-          }),
-        );
+          .map((s) => ({
+            id: s.membre_id!,
+            nom: s.nom,
+            montantCentimes: s.solde_centimes ?? 0,
+            avatarUrl: avatarUrlByMembreId.get(s.membre_id!) ?? null,
+          }));
 
         setData({
           caisseNom: caisseRes.data?.nom ?? "—",
@@ -206,6 +221,7 @@ export default function MembreDashboardPage() {
           monTotalPaiements: mySit?.total_paiements_centimes ?? 0,
           soldeCaisse: soldeRes.data?.solde_centimes ?? 0,
           situations,
+          avatarUrlByMembreId,
           podiumDettes,
           amendes: (amendesRes.data ?? []) as Amende[],
           paiements: (paiementsRes.data ?? []) as Paiement[],
@@ -350,13 +366,14 @@ export default function MembreDashboardPage() {
             Vous êtes le seul membre.
           </p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid gap-3 sm:grid-cols-2">
             {soldesAutres.map((s) => (
               <li
                 key={s.membre_id}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                <span className="flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                  <Avatar src={data.avatarUrlByMembreId.get(s.membre_id ?? "") ?? null} size={40} />
                   {s.nom}
                 </span>
                 <span

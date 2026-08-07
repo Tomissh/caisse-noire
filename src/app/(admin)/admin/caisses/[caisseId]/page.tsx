@@ -32,6 +32,7 @@ import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
 import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
+import { Avatar } from "@/components/features/Avatar";
 import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-dialog";
 import { NouveauPaiementDialog } from "./ecritures/_components/nouveau-paiement-dialog";
 import { NouveauRetraitDialog } from "./ecritures/_components/nouveau-retrait-dialog";
@@ -160,22 +161,33 @@ export default async function CaisseDashboardPage({
     }))
     .sort((a, b) => a.solde - b.solde);
 
+  // Photos de profil : une seule requête groupée (bucket privé "avatars")
+  // pour tous les membres affichés dans Dettes, réutilisée par le podium
+  // (top 3) — retombe sur l'avatar par défaut si absente/en erreur.
+  const { data: avatarSignedUrls } =
+    soldesParMembre.length > 0
+      ? await supabase.storage
+          .from("avatars")
+          .createSignedUrls(
+            soldesParMembre.map((m) => `${caisseId}/${m.membreId}/avatar`),
+            3600,
+          )
+      : { data: [] as { path: string | null; signedUrl: string | null }[] };
+  const avatarUrlByMembreId = new Map<string, string>();
+  for (const r of avatarSignedUrls ?? []) {
+    if (!r.path || !r.signedUrl) continue;
+    const membreId = r.path.split("/")[1];
+    if (membreId) avatarUrlByMembreId.set(membreId, r.signedUrl);
+  }
+
   // Podium des dettes : top 3 des soldes les plus bas (mêmes données que
   // "Dettes" ci-dessous, en médailles).
-  const podiumDettesSansPhoto = soldesParMembre
-    .slice(0, 3)
-    .map((m) => ({ id: m.membreId, nom: m.nom, montantCentimes: m.solde }));
-
-  // Photo de profil du podium : URL signée (bucket privé "avatars"), résolue
-  // par membre ; retombe sur l'avatar par défaut si absente.
-  const podiumDettes = await Promise.all(
-    podiumDettesSansPhoto.map(async (p) => {
-      const { data } = await supabase.storage
-        .from("avatars")
-        .createSignedUrl(`${caisseId}/${p.id}/avatar`, 3600);
-      return { ...p, avatarUrl: data?.signedUrl ?? null };
-    }),
-  );
+  const podiumDettes = soldesParMembre.slice(0, 3).map((m) => ({
+    id: m.membreId,
+    nom: m.nom,
+    montantCentimes: m.solde,
+    avatarUrl: avatarUrlByMembreId.get(m.membreId) ?? null,
+  }));
 
   // Récapitulatif mensuel — membres désactivés exclus (visibles uniquement
   // dans la page de gestion des membres).
@@ -326,13 +338,14 @@ export default async function CaisseDashboardPage({
               Aucun membre. <Link href={`/admin/caisses/${caisseId}/membres/new`} className="underline">Ajouter le premier</Link>.
             </p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-3 lg:grid-cols-2">
               {soldesParMembre.map((m) => (
                 <li
                   key={m.membreId}
-                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
                 >
-                  <div>
+                  <div className="flex items-center gap-3">
+                    <Avatar src={avatarUrlByMembreId.get(m.membreId) ?? null} size={40} />
                     <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {m.nom}
                     </div>

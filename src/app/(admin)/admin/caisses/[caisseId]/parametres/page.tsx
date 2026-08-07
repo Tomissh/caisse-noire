@@ -102,6 +102,7 @@ export default async function ParametresPage({
           admins={adminsList}
           membresDisponibles={membresDisponibles}
           canManage={canManageAdmins}
+          isSuperAdmin={role === "super_admin"}
         />
 
         <DangerZone
