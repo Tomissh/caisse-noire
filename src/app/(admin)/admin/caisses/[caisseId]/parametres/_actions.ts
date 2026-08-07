@@ -190,9 +190,10 @@ const resetAdminPasswordSchema = z.object({ caisseId: uuid, userId: uuid });
 
 type ResetPasswordResult = { ok: true; password: string } | { ok: false; error: string };
 
-// Réinitialise le mot de passe d'un admin de la caisse — super-admin
-// uniquement. updateUserById bypasse la RLS (service-role) : le rôle est
-// vérifié explicitement avant, même raisonnement que addAdminAction pour
+// Réinitialise le mot de passe d'un admin de la caisse — créateur ou
+// super-admin (même périmètre que l'ajout/retrait d'admin, canManage côté
+// UI). updateUserById bypasse la RLS (service-role) : le rôle est vérifié
+// explicitement avant, même raisonnement que addAdminAction pour
 // createUser.
 export async function resetAdminPasswordAction(input: {
   caisseId: string;
@@ -202,8 +203,11 @@ export async function resetAdminPasswordAction(input: {
   if (!parsed.success) return { ok: false, error: "Paramètres invalides" };
 
   const ctx = await requireCaisseAdmin(parsed.data.caisseId);
-  if (ctx.role !== "super_admin") {
-    return { ok: false, error: "Seul un super-admin peut réinitialiser ce mot de passe" };
+  if (ctx.role !== "super_admin" && ctx.role !== "createur") {
+    return {
+      ok: false,
+      error: "Seul le créateur ou un super-admin peut réinitialiser ce mot de passe",
+    };
   }
 
   const supabase = await createClient();

@@ -26,13 +26,11 @@ export function AdminsBlock({
   admins,
   membresDisponibles,
   canManage,
-  isSuperAdmin,
 }: {
   caisseId: string;
   admins: { userId: string; email: string; membreNom: string | null }[];
   membresDisponibles: { id: string; nom: string }[];
   canManage: boolean;
-  isSuperAdmin: boolean;
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -185,7 +183,7 @@ export function AdminsBlock({
                 )}
               </span>
               <div className="flex items-center gap-2">
-                {isSuperAdmin && (
+                {canManage && (
                   <button
                     type="button"
                     onClick={() => onResetPassword(a.userId, a.email)}
