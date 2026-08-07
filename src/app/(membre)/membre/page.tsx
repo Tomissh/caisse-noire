@@ -18,6 +18,7 @@ import { useMembreAuth } from "@/lib/auth/membre-context";
 import { formatEuros, formatSolde } from "@/lib/format";
 import { PodiumPayeurs, type PayeurRow } from "@/components/features/PodiumPayeurs";
 import { Avatar } from "@/components/features/Avatar";
+import { MembreDetteDialog } from "@/components/features/MembreDetteDialog";
 
 type Situation = {
   membre_id: string | null;
@@ -368,25 +369,32 @@ export default function MembreDashboardPage() {
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {soldesAutres.map((s) => (
-              <li
-                key={s.membre_id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <span className="flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  <Avatar src={data.avatarUrlByMembreId.get(s.membre_id ?? "") ?? null} size={40} />
-                  {s.nom}
-                </span>
-                <span
-                  className={`font-mono text-sm font-semibold ${
-                    (s.solde_centimes ?? 0) > 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : (s.solde_centimes ?? 0) < 0
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-zinc-500"
-                  }`}
+              <li key={s.membre_id}>
+                <MembreDetteDialog
+                  supabase={supabase}
+                  caisseId={claims.caisse_id}
+                  membreId={s.membre_id!}
+                  nom={s.nom}
+                  soldeCentimes={s.solde_centimes ?? 0}
+                  avatarUrl={data.avatarUrlByMembreId.get(s.membre_id ?? "") ?? null}
+                  triggerClassName="flex w-full items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/60"
                 >
-                  {formatSolde(s.solde_centimes ?? 0)}
-                </span>
+                  <span className="flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    <Avatar src={data.avatarUrlByMembreId.get(s.membre_id ?? "") ?? null} size={40} />
+                    {s.nom}
+                  </span>
+                  <span
+                    className={`font-mono text-sm font-semibold ${
+                      (s.solde_centimes ?? 0) > 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : (s.solde_centimes ?? 0) < 0
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-zinc-500"
+                    }`}
+                  >
+                    {formatSolde(s.solde_centimes ?? 0)}
+                  </span>
+                </MembreDetteDialog>
               </li>
             ))}
           </ul>

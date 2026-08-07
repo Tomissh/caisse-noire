@@ -32,7 +32,7 @@ import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
 import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
-import { Avatar } from "@/components/features/Avatar";
+import { DetteCard } from "./_components/dette-card";
 import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-dialog";
 import { NouveauPaiementDialog } from "./ecritures/_components/nouveau-paiement-dialog";
 import { NouveauRetraitDialog } from "./ecritures/_components/nouveau-retrait-dialog";
@@ -348,28 +348,14 @@ export default async function CaisseDashboardPage({
           ) : (
             <ul className="grid gap-3 lg:grid-cols-2">
               {soldesParMembre.map((m) => (
-                <li
+                <DetteCard
                   key={m.membreId}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar src={avatarUrlByMembreId.get(m.membreId) ?? null} size={40} />
-                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      {m.nom}
-                    </div>
-                  </div>
-                  <span
-                    className={`font-mono text-sm font-semibold ${
-                      m.solde > 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : m.solde < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-zinc-500"
-                    }`}
-                  >
-                    {formatSolde(m.solde)}
-                  </span>
-                </li>
+                  caisseId={caisseId}
+                  membreId={m.membreId}
+                  nom={m.nom}
+                  soldeCentimes={m.solde}
+                  avatarUrl={avatarUrlByMembreId.get(m.membreId) ?? null}
+                />
               ))}
             </ul>
           )}
