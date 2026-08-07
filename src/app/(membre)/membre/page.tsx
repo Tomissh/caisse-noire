@@ -31,6 +31,7 @@ type Amende = {
   id: string;
   libelle: string;
   montant_centimes: number;
+  jour_match: boolean;
   created_at: string;
 };
 
@@ -121,7 +122,7 @@ export default function MembreDashboardPage() {
               .maybeSingle(),
             supabase
               .from("amendes")
-              .select("id, libelle, montant_centimes, created_at")
+              .select("id, libelle, montant_centimes, jour_match, created_at")
               .eq("caisse_id", claims.caisse_id)
               .eq("membre_id", claims.membre_id)
               .is("supprimee_at", null)
@@ -242,7 +243,7 @@ export default function MembreDashboardPage() {
 
   const soldesAutres = data.situations
     .filter((s) => s.membre_id !== claims.membre_id && s.actif)
-    .sort((a, b) => (b.solde_centimes ?? 0) - (a.solde_centimes ?? 0));
+    .sort((a, b) => (a.solde_centimes ?? 0) - (b.solde_centimes ?? 0));
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -322,6 +323,7 @@ export default function MembreDashboardPage() {
             primary: a.libelle,
             secondary: formatDate(a.created_at),
             amount: -a.montant_centimes,
+            badge: a.jour_match ? "JDM" : null,
           }))}
           fullCount={data.amendes.length}
         />
@@ -341,7 +343,7 @@ export default function MembreDashboardPage() {
       {/* Soldes des autres membres ------------------------------------ */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-          Soldes des autres membres
+          Toutes les dettes 💸
         </h2>
         {soldesAutres.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
@@ -429,7 +431,13 @@ function ListBlock({
 }: {
   title: string;
   empty: string;
-  rows: { key: string; primary: string; secondary: string; amount: number }[];
+  rows: {
+    key: string;
+    primary: string;
+    secondary: string;
+    amount: number;
+    badge?: string | null;
+  }[];
   fullCount: number;
 }) {
   return (
@@ -447,6 +455,11 @@ function ListBlock({
               >
                 <span className="flex-1 truncate text-zinc-700 dark:text-zinc-300">
                   {r.primary}
+                  {r.badge && (
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                      {r.badge}
+                    </span>
+                  )}
                 </span>
                 <span className="text-zinc-500 dark:text-zinc-400">{r.secondary}</span>
                 <span
