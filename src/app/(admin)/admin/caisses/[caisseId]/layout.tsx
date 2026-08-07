@@ -22,6 +22,7 @@ export default async function CaisseLayout({
         code={ctx.caisse.code}
         cloturee={Boolean(ctx.caisse.cloturee_at)}
         role={ctx.role}
+        membreId={ctx.membreId}
       />
       <div className="flex flex-1 flex-col">{children}</div>
     </div>

@@ -26,6 +26,10 @@ export type CaisseAdminContext = {
   caisse: CaisseRow;
   role: AdminRole;
   userId: string;
+  // Membre de la caisse auquel cet admin est lié (admins_caisse.membre_id),
+  // ou null s'il n'est lié à aucun — permet de proposer la modification de
+  // sa propre photo de profil directement depuis l'espace admin.
+  membreId: string | null;
 };
 
 export async function requireCaisseAdmin(caisseId: string): Promise<CaisseAdminContext> {
@@ -45,22 +49,24 @@ export async function requireCaisseAdmin(caisseId: string): Promise<CaisseAdminC
 
   if (!caisse) notFound();
 
-  if (caisse.createur_id === user.id) {
-    return { caisse, role: "createur", userId: user.id };
-  }
-
-  // Vérifie super-admin (très rare cas, en parallèle de admins_caisse)
+  // Vérifie super-admin + lien membre (en parallèle, quel que soit le rôle
+  // final — un créateur peut aussi apparaître dans admins_caisse s'il s'est
+  // lié à un membre).
   const [{ data: superAdmin }, { data: adminRow }] = await Promise.all([
     supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
     supabase
       .from("admins_caisse")
-      .select("user_id")
+      .select("user_id, membre_id")
       .eq("caisse_id", caisseId)
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
+  const membreId = adminRow?.membre_id ?? null;
 
-  if (superAdmin) return { caisse, role: "super_admin", userId: user.id };
-  if (adminRow) return { caisse, role: "admin", userId: user.id };
+  if (caisse.createur_id === user.id) {
+    return { caisse, role: "createur", userId: user.id, membreId };
+  }
+  if (superAdmin) return { caisse, role: "super_admin", userId: user.id, membreId };
+  if (adminRow) return { caisse, role: "admin", userId: user.id, membreId };
   notFound();
 }

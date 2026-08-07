@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useAdminAuth } from "@/lib/auth/admin-context";
 import type { AdminRole } from "@/lib/auth/roles";
+import { AdminAvatarUploader } from "./admin-avatar-uploader";
 
 type NavItem = { slug: string; label: string; soon?: boolean };
 
@@ -24,12 +25,14 @@ export function CaisseSidebar({
   code,
   cloturee,
   role,
+  membreId,
 }: {
   caisseId: string;
   nom: string;
   code: string;
   cloturee: boolean;
   role: AdminRole;
+  membreId: string | null;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -64,7 +67,10 @@ export function CaisseSidebar({
         >
           ← Mes caisses
         </Link>
-        <div className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">{nom}</div>
+        <div className="mt-3 flex items-center gap-2">
+          {membreId && <AdminAvatarUploader caisseId={caisseId} membreId={membreId} size={28} />}
+          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{nom}</span>
+        </div>
         <div className="mt-1 flex items-center gap-2 text-xs">
           <span className="font-mono text-zinc-600 dark:text-zinc-400">{code}</span>
           <button
