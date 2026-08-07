@@ -186,7 +186,12 @@ export async function addAdminAction(input: {
   return password ? { ok: true, password } : { ok: true };
 }
 
-const resetAdminPasswordSchema = z.object({ caisseId: uuid, userId: uuid });
+const resetAdminPasswordSchema = z.object({
+  caisseId: uuid,
+  userId: uuid,
+  // Laissé vide/absent : un mot de passe est généré aléatoirement.
+  password: z.string().min(8, "≥ 8 caractères").max(200).optional(),
+});
 
 type ResetPasswordResult = { ok: true; password: string } | { ok: false; error: string };
 
@@ -198,9 +203,12 @@ type ResetPasswordResult = { ok: true; password: string } | { ok: false; error: 
 export async function resetAdminPasswordAction(input: {
   caisseId: string;
   userId: string;
+  password?: string;
 }): Promise<ResetPasswordResult> {
   const parsed = resetAdminPasswordSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Paramètres invalides" };
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Paramètres invalides" };
+  }
 
   const ctx = await requireCaisseAdmin(parsed.data.caisseId);
   if (ctx.role !== "super_admin" && ctx.role !== "createur") {
@@ -219,7 +227,7 @@ export async function resetAdminPasswordAction(input: {
     .maybeSingle();
   if (!adminRow) return { ok: false, error: "Cet utilisateur n'est pas admin de cette caisse" };
 
-  const password = generatePassword(16);
+  const password = parsed.data.password ?? generatePassword(16);
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, { password });
   if (error) return { ok: false, error: error.message };

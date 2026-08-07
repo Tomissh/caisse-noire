@@ -37,10 +37,18 @@ import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-di
 import { NouveauPaiementDialog } from "./ecritures/_components/nouveau-paiement-dialog";
 import { NouveauRetraitDialog } from "./ecritures/_components/nouveau-retrait-dialog";
 
+// Mois courant, en heure locale de la caisse (Europe/Paris) — pas celle du
+// serveur (UTC sur Vercel), pour rester cohérent avec le rattachement des
+// écritures au mois fait par situation_caisse_mois (même fuseau).
 function currentMonthDefault(): string {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === "year")!.value;
+  const month = parts.find((p) => p.type === "month")!.value;
+  return `${year}-${month}`;
 }
 
 function moisLabel(mois: string): string {

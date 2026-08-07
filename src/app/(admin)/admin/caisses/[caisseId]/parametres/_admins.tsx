@@ -40,6 +40,9 @@ export function AdminsBlock({
   const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(
     null,
   );
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -87,18 +90,40 @@ export function AdminsBlock({
     });
   };
 
+  const openResetPassword = (userId: string) => {
+    setResettingUserId(userId);
+    setResetPasswordValue("");
+    setResetError(null);
+  };
+
+  const closeResetPassword = () => {
+    setResettingUserId(null);
+    setResetPasswordValue("");
+    setResetError(null);
+  };
+
   const onResetPassword = async (userId: string, email: string) => {
-    if (!confirm(`Réinitialiser le mot de passe de ${email} ?`)) return;
+    if (resetPasswordValue && resetPasswordValue.length < 8) {
+      setResetError("≥ 8 caractères");
+      return;
+    }
+    setResetError(null);
     setResetPending(userId);
-    const res = await resetAdminPasswordAction({ caisseId, userId });
+    const res = await resetAdminPasswordAction({
+      caisseId,
+      userId,
+      password: resetPasswordValue || undefined,
+    });
     setResetPending(null);
     if (!res.ok) {
+      setResetError(res.error);
       toast.error(res.error);
       return;
     }
     setCreated(null);
     setResetResult({ email, password: res.password });
     toast.success("Mot de passe réinitialisé");
+    closeResetPassword();
   };
 
   return (
@@ -173,37 +198,79 @@ export function AdminsBlock({
       ) : (
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {admins.map((a) => (
-            <li key={a.userId} className="flex items-center justify-between py-2 text-sm">
-              <span className="text-zinc-700 dark:text-zinc-300">
-                {a.email}
-                {a.membreNom && (
-                  <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                    {a.membreNom}
-                  </span>
-                )}
-              </span>
-              <div className="flex items-center gap-2">
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => onResetPassword(a.userId, a.email)}
-                    disabled={resetPending === a.userId}
-                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    {resetPending === a.userId ? "…" : "Réinitialiser le mot de passe"}
-                  </button>
-                )}
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => onRemove(a.userId)}
-                    disabled={pending}
-                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    Retirer
-                  </button>
-                )}
+            <li key={a.userId} className="py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-700 dark:text-zinc-300">
+                  {a.email}
+                  {a.membreNom && (
+                    <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                      {a.membreNom}
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-2">
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        resettingUserId === a.userId
+                          ? closeResetPassword()
+                          : openResetPassword(a.userId)
+                      }
+                      className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Réinitialiser le mot de passe
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => onRemove(a.userId)}
+                      disabled={pending}
+                      className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Retirer
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {resettingUserId === a.userId && (
+                <div className="mt-2 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950/50">
+                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    Nouveau mot de passe pour {a.email} (optionnel — laisser vide pour en
+                    générer un aléatoirement)
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={resetPasswordValue}
+                    onChange={(e) => setResetPasswordValue(e.target.value)}
+                    placeholder="≥ 8 caractères, ou vide"
+                    className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  />
+                  {resetError && (
+                    <p className="text-xs text-red-600 dark:text-red-400">{resetError}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onResetPassword(a.userId, a.email)}
+                      disabled={resetPending === a.userId}
+                      className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                    >
+                      {resetPending === a.userId ? "…" : "Confirmer"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeResetPassword}
+                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>
