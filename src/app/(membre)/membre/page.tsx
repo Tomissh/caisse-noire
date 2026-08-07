@@ -176,8 +176,10 @@ export default function MembreDashboardPage() {
         const mySit = situations.find((s) => s.membre_id === claims.membre_id);
 
         // Podium des dettes : top 3 des soldes les plus bas — même calcul
-        // que le dashboard admin.
-        const podiumDettesSansPhoto = [...situations]
+        // que le dashboard admin. Membres désactivés exclus (visibles
+        // uniquement dans la page de gestion des membres, côté admin).
+        const podiumDettesSansPhoto = situations
+          .filter((s) => s.actif)
           .sort((a, b) => (a.solde_centimes ?? 0) - (b.solde_centimes ?? 0))
           .slice(0, 3)
           .map((s) => ({ id: s.membre_id!, nom: s.nom, montantCentimes: s.solde_centimes ?? 0 }));
@@ -238,8 +240,8 @@ export default function MembreDashboardPage() {
     );
   }
 
-  const soldesAutres = [...data.situations]
-    .filter((s) => s.membre_id !== claims.membre_id)
+  const soldesAutres = data.situations
+    .filter((s) => s.membre_id !== claims.membre_id && s.actif)
     .sort((a, b) => (b.solde_centimes ?? 0) - (a.solde_centimes ?? 0));
 
   return (
@@ -350,9 +352,7 @@ export default function MembreDashboardPage() {
             {soldesAutres.map((s) => (
               <li
                 key={s.membre_id}
-                className={`flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900 ${
-                  s.actif ? "" : "opacity-60"
-                }`}
+                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                   {s.nom}

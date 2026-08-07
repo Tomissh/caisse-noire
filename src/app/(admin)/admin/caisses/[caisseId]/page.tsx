@@ -145,16 +145,17 @@ export default async function CaisseDashboardPage({
   // côté client, plutôt qu'un embed PostgREST qui échoue silencieusement
   // (une vue n'expose pas de clé étrangère vers `membres`). Solde = cumul
   // paiements − amendes (v_membre_situation) ; triées du plus endetté (solde
-  // le plus négatif) au plus créditeur.
+  // le plus négatif) au plus créditeur. Les membres désactivés n'apparaissent
+  // plus que dans la page de gestion des membres.
   const soldeByMembreId = new Map<string, number>();
   for (const r of situationsRes.data ?? []) {
     if (r.membre_id) soldeByMembreId.set(r.membre_id, r.solde_centimes ?? 0);
   }
   const soldesParMembre = (membresRes.data ?? [])
+    .filter((m) => m.actif)
     .map((m) => ({
       membreId: m.id,
       nom: m.nom,
-      actif: m.actif,
       solde: soldeByMembreId.get(m.id) ?? 0,
     }))
     .sort((a, b) => a.solde - b.solde);
@@ -176,8 +177,9 @@ export default async function CaisseDashboardPage({
     }),
   );
 
-  // Récapitulatif mensuel
-  const recapRows = [...(recapMoisRes.data ?? [])].sort((a, b) => {
+  // Récapitulatif mensuel — membres désactivés exclus (visibles uniquement
+  // dans la page de gestion des membres).
+  const recapRows = (recapMoisRes.data ?? []).filter((r) => r.actif).sort((a, b) => {
     if (b.montant_a_payer_centimes !== a.montant_a_payer_centimes) {
       return b.montant_a_payer_centimes - a.montant_a_payer_centimes;
     }
@@ -328,17 +330,12 @@ export default async function CaisseDashboardPage({
               {soldesParMembre.map((m) => (
                 <li
                   key={m.membreId}
-                  className={`flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900 ${
-                    m.actif ? "" : "opacity-60"
-                  }`}
+                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
                 >
                   <div>
                     <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {m.nom}
                     </div>
-                    {!m.actif && (
-                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">désactivé</div>
-                    )}
                   </div>
                   <span
                     className={`font-mono text-sm font-semibold ${
@@ -400,17 +397,10 @@ export default async function CaisseDashboardPage({
                   {recapRows.map((r) => (
                     <tr
                       key={r.membre_id}
-                      className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800/60 ${
-                        r.actif ? "" : "opacity-60"
-                      }`}
+                      className="border-b border-zinc-100 last:border-0 dark:border-zinc-800/60"
                     >
                       <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-50">
                         {r.nom}
-                        {!r.actif && (
-                          <span className="ml-1.5 text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
-                            (désactivé)
-                          </span>
-                        )}
                       </td>
                       <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
                         {formatSolde(r.solde_avant_centimes)}
