@@ -474,7 +474,7 @@ export default async function CaisseDashboardPage({
               Aucune écriture pour le moment.
             </p>
           ) : (
-            <EcrituresList items={lastFive} readOnly />
+            <EcrituresList items={lastFive} readOnly showActor={false} />
           )}
         </section>
       </div>

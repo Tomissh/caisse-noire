@@ -65,9 +65,14 @@ function formatDate(iso: string): string {
 export function EcrituresList({
   items,
   readOnly,
+  showActor = true,
 }: {
   items: EcritureItem[];
   readOnly: boolean;
+  /** Affiche l'email du déclarant au clic. Sur le tableau de bord, on
+   * préfère montrer les détails de l'écriture (motif, date...) — l'email
+   * reste consultable sur la page Écritures dédiée. */
+  showActor?: boolean;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EcritureItem | null>(null);
@@ -139,9 +144,34 @@ export function EcrituresList({
 
               {expanded && (
                 <div className="space-y-1 border-t border-zinc-100 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
-                  <div>
-                    <strong>Enregistrée par :</strong> {it.acteurEmail}
-                  </div>
+                  {showActor ? (
+                    <div>
+                      <strong>Enregistrée par :</strong> {it.acteurEmail}
+                    </div>
+                  ) : (
+                    <>
+                      {it.membreNom && (
+                        <div>
+                          <strong>Membre :</strong> {it.membreNom}
+                        </div>
+                      )}
+                      <div>
+                        <strong>Motif :</strong> {it.libelle}
+                      </div>
+                      <div>
+                        <strong>Date :</strong> {formatDate(it.createdAt)}
+                      </div>
+                      <div>
+                        <strong>Montant :</strong> {formatSolde(signed)}
+                      </div>
+                      {it.moyen && (
+                        <div>
+                          <strong>Moyen :</strong> {MOYEN_LABEL[it.moyen]}
+                        </div>
+                      )}
+                      {it.jourMatch && <div>Jour de match ×2</div>}
+                    </>
+                  )}
                   {isDeleted && (
                     <>
                       <div>
