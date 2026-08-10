@@ -62,8 +62,8 @@ export function DeleteDialog({
             Supprimer cette écriture ?
           </h2>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+            {item.membreNom && `${item.membreNom} — `}
             {item.libelle}
-            {item.membreNom && ` — ${item.membreNom}`}
           </p>
         </header>
 

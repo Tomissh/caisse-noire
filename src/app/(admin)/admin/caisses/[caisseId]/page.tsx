@@ -254,7 +254,7 @@ export default async function CaisseDashboardPage({
       caisseId: p.caisse_id,
       createdAt: p.created_at,
       montantCentimes: p.montant_centimes,
-      libelle: m ? `Paiement ${m.nom}` : "Paiement",
+      libelle: "Paiement",
       membreNom: m ? m.nom : null,
       moyen: p.moyen,
       jourMatch: false,

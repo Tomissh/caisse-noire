@@ -212,7 +212,7 @@ export default async function EcrituresPage({
       caisseId: p.caisse_id,
       createdAt: p.created_at,
       montantCentimes: p.montant_centimes,
-      libelle: m ? `Paiement ${m.nom}` : "Paiement",
+      libelle: "Paiement",
       membreNom: m ? m.nom : "(membre supprimé)",
       moyen: p.moyen,
       jourMatch: false,

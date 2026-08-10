@@ -97,17 +97,14 @@ export function EcrituresList({
                 >
                   {BADGE_LABEL[it.type]}
                 </span>
-                <span className="w-28 shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                  {formatDate(it.createdAt)}
-                </span>
                 <span className="flex-1 truncate text-zinc-800 dark:text-zinc-200">
-                  {it.libelle}
-                  {it.membreNom && it.type === "amende" && (
-                    <span className="text-zinc-500 dark:text-zinc-400">
-                      {" "}
-                      — {it.membreNom}
-                    </span>
+                  {it.membreNom && (
+                    <span className="font-semibold">{it.membreNom}</span>
                   )}
+                  {it.membreNom && (
+                    <span className="text-zinc-500 dark:text-zinc-400"> — </span>
+                  )}
+                  {it.libelle}
                   {it.moyen && (
                     <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                       {MOYEN_LABEL[it.moyen]}
@@ -124,8 +121,11 @@ export function EcrituresList({
                     </span>
                   )}
                 </span>
+                <span className="shrink-0 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                  {formatDate(it.createdAt)}
+                </span>
                 <span
-                  className={`shrink-0 font-mono text-sm font-medium ${
+                  className={`w-20 shrink-0 text-right font-mono text-sm font-medium ${
                     signed > 0
                       ? "text-emerald-600 dark:text-emerald-400"
                       : signed < 0
