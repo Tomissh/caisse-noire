@@ -111,6 +111,11 @@ export function formatAuditAction(
         detail: [lib, mt].filter(Boolean).join(" — "),
       };
     }
+    case "pack.create": {
+      const m = membreNomFromMap(payload, membresById);
+      const verbe = payload["delta"] === -1 ? "retiré" : "ajouté";
+      return { kind: "text", label: `Pack ${verbe}`, detail: m ?? undefined };
+    }
     case "caisse.create": {
       return {
         kind: "text",
@@ -176,6 +181,7 @@ export const ACTION_OPTIONS = [
   { value: "paiement.create", label: "Paiement — création" },
   { value: "paiement.delete", label: "Paiement — suppression" },
   { value: "retrait.create", label: "Retrait — création" },
+  { value: "pack.create", label: "Pack — mouvement" },
   { value: "caisse.create", label: "Caisse — création" },
   { value: "caisse.update", label: "Caisse — modification" },
   { value: "caisse.cloture", label: "Caisse — clôture" },

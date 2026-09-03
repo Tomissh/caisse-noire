@@ -54,6 +54,26 @@ describe("formatAuditAction", () => {
     });
   });
 
+  it("formate l'ajout d'un pack", () => {
+    const result = formatAuditAction(
+      "pack.create",
+      { membre_id: "m1", delta: 1 },
+      membresById,
+      emailsById,
+    );
+    expect(result).toEqual({ kind: "text", label: "Pack ajouté", detail: "Alice Martin" });
+  });
+
+  it("formate le retrait d'un pack", () => {
+    const result = formatAuditAction(
+      "pack.create",
+      { membre_id: "m1", delta: -1 },
+      membresById,
+      emailsById,
+    );
+    expect(result).toEqual({ kind: "text", label: "Pack retiré", detail: "Alice Martin" });
+  });
+
   it("construit un diff lisible pour caisse.update", () => {
     const result = formatAuditAction(
       "caisse.update",

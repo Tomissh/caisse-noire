@@ -35,6 +35,7 @@ import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
 import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
 import { DetteCard } from "./_components/dette-card";
+import { PacksSection } from "./_components/packs-section";
 import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-dialog";
 import { NouveauPaiementDialog } from "./ecritures/_components/nouveau-paiement-dialog";
 import { NouveauRetraitDialog } from "./ecritures/_components/nouveau-retrait-dialog";
@@ -81,6 +82,7 @@ export default async function CaisseDashboardPage({
     membresRes,
     motifsRes,
     situationsRes,
+    packsRes,
     recapMoisRes,
     amendesLastRes,
     paiementsLastRes,
@@ -104,6 +106,7 @@ export default async function CaisseDashboardPage({
       .from("v_membre_situation")
       .select("membre_id, solde_centimes")
       .eq("caisse_id", caisseId),
+    supabase.from("v_membre_packs").select("membre_id, packs_count").eq("caisse_id", caisseId),
     supabase.rpc("recap_mensuel_simple", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
     supabase
       .from("amendes")
@@ -198,6 +201,22 @@ export default async function CaisseDashboardPage({
     montantCentimes: m.solde,
     avatarUrl: avatarUrlByMembreId.get(m.membreId) ?? null,
   }));
+
+  // Packs : compteur simple par membre actif, sans montant. Deux requêtes
+  // séparées fusionnées côté client, même raison que Dettes (une vue
+  // n'expose pas de clé étrangère vers `membres` pour PostgREST).
+  const packsByMembreId = new Map<string, number>();
+  for (const r of packsRes.data ?? []) {
+    if (r.membre_id) packsByMembreId.set(r.membre_id, r.packs_count ?? 0);
+  }
+  const packsRows = (membresRes.data ?? [])
+    .filter((m) => m.actif)
+    .map((m) => ({
+      membreId: m.id,
+      nom: m.nom,
+      count: packsByMembreId.get(m.id) ?? 0,
+    }))
+    .sort((a, b) => a.nom.localeCompare(b.nom));
 
   // Récapitulatif mensuel — membres désactivés exclus (visibles uniquement
   // dans la page de gestion des membres).
@@ -438,6 +457,12 @@ export default async function CaisseDashboardPage({
               </table>
             </div>
           )}
+        </section>
+
+        {/* Packs ----------------------------------------------------------- */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Packs</h2>
+          <PacksSection caisseId={caisseId} rows={packsRows} />
         </section>
 
         {/* Dernières écritures ----------------------------------------- */}

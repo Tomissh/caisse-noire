@@ -102,6 +102,13 @@ export type Database = {
             foreignKeyName: "admins_caisse_membre_id_fkey"
             columns: ["membre_id"]
             isOneToOne: false
+            referencedRelation: "v_membre_packs"
+            referencedColumns: ["membre_id"]
+          },
+          {
+            foreignKeyName: "admins_caisse_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
             referencedRelation: "v_membre_situation"
             referencedColumns: ["membre_id"]
           },
@@ -179,6 +186,13 @@ export type Database = {
             foreignKeyName: "amendes_membre_id_fkey"
             columns: ["membre_id"]
             isOneToOne: false
+            referencedRelation: "v_membre_packs"
+            referencedColumns: ["membre_id"]
+          },
+          {
+            foreignKeyName: "amendes_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
             referencedRelation: "v_membre_situation"
             referencedColumns: ["membre_id"]
           },
@@ -232,6 +246,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "membres"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_acteur_membre_id_fkey"
+            columns: ["acteur_membre_id"]
+            isOneToOne: false
+            referencedRelation: "v_membre_packs"
+            referencedColumns: ["membre_id"]
           },
           {
             foreignKeyName: "audit_log_acteur_membre_id_fkey"
@@ -394,6 +415,69 @@ export type Database = {
           },
         ]
       }
+      packs_mouvements: {
+        Row: {
+          caisse_id: string
+          created_at: string
+          delta: number
+          enregistre_par_user_id: string
+          id: string
+          membre_id: string
+        }
+        Insert: {
+          caisse_id: string
+          created_at?: string
+          delta: number
+          enregistre_par_user_id: string
+          id?: string
+          membre_id: string
+        }
+        Update: {
+          caisse_id?: string
+          created_at?: string
+          delta?: number
+          enregistre_par_user_id?: string
+          id?: string
+          membre_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packs_mouvements_caisse_id_fkey"
+            columns: ["caisse_id"]
+            isOneToOne: false
+            referencedRelation: "caisses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packs_mouvements_caisse_id_fkey"
+            columns: ["caisse_id"]
+            isOneToOne: false
+            referencedRelation: "v_caisse_solde"
+            referencedColumns: ["caisse_id"]
+          },
+          {
+            foreignKeyName: "packs_mouvements_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
+            referencedRelation: "membres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packs_mouvements_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
+            referencedRelation: "v_membre_packs"
+            referencedColumns: ["membre_id"]
+          },
+          {
+            foreignKeyName: "packs_mouvements_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
+            referencedRelation: "v_membre_situation"
+            referencedColumns: ["membre_id"]
+          },
+        ]
+      }
       paiements: {
         Row: {
           caisse_id: string
@@ -452,6 +536,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "membres"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paiements_membre_id_fkey"
+            columns: ["membre_id"]
+            isOneToOne: false
+            referencedRelation: "v_membre_packs"
+            referencedColumns: ["membre_id"]
           },
           {
             foreignKeyName: "paiements_membre_id_fkey"
@@ -529,6 +620,29 @@ export type Database = {
           total_retraits_centimes: number | null
         }
         Relationships: []
+      }
+      v_membre_packs: {
+        Row: {
+          caisse_id: string | null
+          membre_id: string | null
+          packs_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membres_caisse_id_fkey"
+            columns: ["caisse_id"]
+            isOneToOne: false
+            referencedRelation: "caisses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membres_caisse_id_fkey"
+            columns: ["caisse_id"]
+            isOneToOne: false
+            referencedRelation: "v_caisse_solde"
+            referencedColumns: ["caisse_id"]
+          },
+        ]
       }
       v_membre_situation: {
         Row: {
