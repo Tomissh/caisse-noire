@@ -9,11 +9,13 @@
 // endettés), sur la base du solde actuel (v_membre_situation), pas des
 // paiements du mois — même donnée que la section Dettes, en médailles.
 //
-// Récapitulatif mensuel : ce que chaque membre doit encore payer pour un
-// mois donné, en tenant compte de son solde reporté (avance/retard) —
-// RPC situation_caisse_mois, navigable par mois via ?mois=YYYY-MM. Un
-// paiement est rattaché au mois des amendes qu'il solde (décalage de 7 j),
-// pas au mois où il a été enregistré. Classement copiable pour relance.
+// Récapitulatif mensuel : ce que chaque membre a pris comme amendes durant
+// le mois affiché (mois M), et ce qu'il a payé le mois suivant (M+1) — les
+// membres paient leurs amendes du mois en début du mois d'après, donc le
+// "payé" pertinent pour la ligne du mois M est celui de M+1, pas celui de M.
+// RPC recap_mensuel_simple, navigable par mois via ?mois=YYYY-MM. Vue brute
+// (pas de solde cumulé/reporté) — voir v_membre_situation et la carte
+// Dettes pour le solde réel d'un membre. Classement copiable pour relance.
 //
 // Soldes par membre : liste de cards triée par solde décroissant
 // (créditeurs en haut, dettes en bas). Requête en deux temps (membres +
@@ -26,7 +28,7 @@ import Link from "next/link";
 import { requireCaisseAdmin } from "@/lib/auth/guard-caisse";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { centimesToEuros, formatEuros, formatSolde } from "@/lib/format";
+import { centimesToEuros, formatEuros } from "@/lib/format";
 import type { EcritureItem } from "./ecritures/_components/list";
 import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
@@ -102,7 +104,7 @@ export default async function CaisseDashboardPage({
       .from("v_membre_situation")
       .select("membre_id, solde_centimes")
       .eq("caisse_id", caisseId),
-    supabase.rpc("situation_caisse_mois", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
+    supabase.rpc("recap_mensuel_simple", { p_caisse_id: caisseId, p_mois: `${mois}-01` }),
     supabase
       .from("amendes")
       .select(
@@ -200,12 +202,13 @@ export default async function CaisseDashboardPage({
   // Récapitulatif mensuel — membres désactivés exclus (visibles uniquement
   // dans la page de gestion des membres).
   const recapRows = (recapMoisRes.data ?? []).filter((r) => r.actif).sort((a, b) => {
-    if (b.montant_a_payer_centimes !== a.montant_a_payer_centimes) {
-      return b.montant_a_payer_centimes - a.montant_a_payer_centimes;
+    if (b.amendes_mois_centimes !== a.amendes_mois_centimes) {
+      return b.amendes_mois_centimes - a.amendes_mois_centimes;
     }
     return a.nom.localeCompare(b.nom);
   });
-  const totalAPayer = recapRows.reduce((s, r) => s + r.montant_a_payer_centimes, 0);
+  const totalAPayer = recapRows.reduce((s, r) => s + r.amendes_mois_centimes, 0);
+  const totalPaye = recapRows.reduce((s, r) => s + r.paiements_mois_suivant_centimes, 0);
 
   // Résolution emails déclarants pour les écritures du dashboard
   const userIds = new Set<string>();
@@ -378,7 +381,7 @@ export default async function CaisseDashboardPage({
           <ClassementPanel
             rows={recapRows.map((r) => ({
               nom: r.nom,
-              montantAPayerCentimes: r.montant_a_payer_centimes,
+              montantAPayerCentimes: r.amendes_mois_centimes,
             }))}
           />
           {recapRows.length === 0 ? (
@@ -387,17 +390,12 @@ export default async function CaisseDashboardPage({
             </p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-[360px] text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
                     <th className="px-3 py-2">Membre</th>
-                    <th className="px-3 py-2 text-right">Solde reporté</th>
-                    <th className="px-3 py-2 text-right">Amendes du mois</th>
-                    {ctx.caisse.cotisation_active && (
-                      <th className="px-3 py-2 text-right">Cotisation</th>
-                    )}
-                    <th className="px-3 py-2 text-right">Payé ce mois</th>
                     <th className="px-3 py-2 text-right">À payer</th>
+                    <th className="px-3 py-2 text-right">Payé</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -409,48 +407,34 @@ export default async function CaisseDashboardPage({
                       <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-50">
                         {r.nom}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
-                        {formatSolde(r.solde_avant_centimes)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-zinc-900 dark:text-zinc-50">
-                        {formatEuros(r.amendes_mois_centimes)}
-                      </td>
-                      {ctx.caisse.cotisation_active && (
-                        <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
-                          {r.cotisation_mois_centimes > 0
-                            ? formatEuros(r.cotisation_mois_centimes)
-                            : "—"}
-                        </td>
-                      )}
-                      <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
-                        {formatEuros(r.paiements_mois_centimes)}
-                      </td>
                       <td className="px-3 py-2 text-right font-mono font-semibold">
                         <span
                           className={
-                            r.montant_a_payer_centimes > 0
+                            r.amendes_mois_centimes > 0
                               ? "text-red-600 dark:text-red-400"
                               : "text-zinc-500"
                           }
                         >
-                          {formatEuros(r.montant_a_payer_centimes)}
+                          {formatEuros(r.amendes_mois_centimes)}
                         </span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
+                        {formatEuros(r.paiements_mois_suivant_centimes)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                {totalAPayer > 0 && (
-                  <tfoot>
-                    <tr className="border-t border-zinc-200 bg-zinc-50 font-semibold dark:border-zinc-800 dark:bg-zinc-900">
-                      <td className="px-3 py-2" colSpan={ctx.caisse.cotisation_active ? 5 : 4}>
-                        Total restant à payer
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-red-600 dark:text-red-400">
-                        {formatEuros(totalAPayer)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
+                <tfoot>
+                  <tr className="border-t border-zinc-200 bg-zinc-50 font-semibold dark:border-zinc-800 dark:bg-zinc-900">
+                    <td className="px-3 py-2">Total</td>
+                    <td className="px-3 py-2 text-right font-mono text-red-600 dark:text-red-400">
+                      {formatEuros(totalAPayer)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
+                      {formatEuros(totalPaye)}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}

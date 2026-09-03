@@ -572,23 +572,18 @@ export type Database = {
       }
       is_membre_of: { Args: { p_caisse_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
-      reouvrir_caisse: { Args: { p_caisse_id: string }; Returns: undefined }
-      resolve_username_email: { Args: { p_username: string }; Returns: string }
-      situation_caisse_mois: {
+      recap_mensuel_simple: {
         Args: { p_caisse_id: string; p_mois: string }
         Returns: {
           actif: boolean
           amendes_mois_centimes: number
-          avance_centimes: number
-          cotisation_mois_centimes: number
           membre_id: string
-          montant_a_payer_centimes: number
           nom: string
-          paiements_mois_centimes: number
-          solde_apres_centimes: number
-          solde_avant_centimes: number
+          paiements_mois_suivant_centimes: number
         }[]
       }
+      reouvrir_caisse: { Args: { p_caisse_id: string }; Returns: undefined }
+      resolve_username_email: { Args: { p_username: string }; Returns: string }
       situation_membre_par_mois: {
         Args: { p_membre_id: string }
         Returns: {
