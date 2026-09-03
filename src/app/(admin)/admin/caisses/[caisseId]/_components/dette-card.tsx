@@ -15,12 +15,14 @@ export function DetteCard({
   membreId,
   nom,
   soldeCentimes,
+  packsCount,
   avatarUrl,
 }: {
   caisseId: string;
   membreId: string;
   nom: string;
   soldeCentimes: number;
+  packsCount: number;
   avatarUrl: string | null;
 }) {
   const { supabase } = useAdminAuth();
@@ -33,12 +35,21 @@ export function DetteCard({
         membreId={membreId}
         nom={nom}
         soldeCentimes={soldeCentimes}
+        packsCount={packsCount}
+        canEditPacks
         avatarUrl={avatarUrl}
         triggerClassName="flex w-full items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/60"
       >
         <div className="flex items-center gap-3">
           <Avatar src={avatarUrl} size={40} alt={nom} />
-          <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{nom}</div>
+          <div>
+            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{nom}</div>
+            {packsCount > 0 && (
+              <div className="text-xs text-zinc-400 dark:text-zinc-500">
+                {packsCount} pack{packsCount > 1 ? "s" : ""}
+              </div>
+            )}
+          </div>
         </div>
         <span
           className={`font-mono text-sm font-semibold ${

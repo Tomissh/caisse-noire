@@ -9,8 +9,9 @@
 // dernières amendes attribuées — chargées à l'ouverture seulement (pas au
 // chargement de la liste, pour éviter une requête par membre affiché).
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { toast } from "sonner";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   Dialog,
@@ -21,6 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar } from "./Avatar";
 import { formatEuros, formatSolde } from "@/lib/format";
+import {
+  ajouterPackAction,
+  retirerPackAction,
+} from "@/app/(admin)/admin/caisses/[caisseId]/_actions";
 
 type AmendeRow = {
   id: string;
@@ -44,6 +49,8 @@ export function MembreDetteDialog({
   membreId,
   nom,
   soldeCentimes,
+  packsCount = 0,
+  canEditPacks = false,
   avatarUrl,
   triggerClassName,
   children,
@@ -53,6 +60,8 @@ export function MembreDetteDialog({
   membreId: string;
   nom: string;
   soldeCentimes: number;
+  packsCount?: number;
+  canEditPacks?: boolean;
   avatarUrl: string | null;
   triggerClassName?: string;
   children: React.ReactNode;
@@ -61,6 +70,29 @@ export function MembreDetteDialog({
   const [loading, setLoading] = useState(false);
   const [amendes, setAmendes] = useState<AmendeRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [packs, setPacks] = useState(packsCount);
+  const [prevPacksCount, setPrevPacksCount] = useState(packsCount);
+  const [packsPending, startPacksTransition] = useTransition();
+
+  // Resynchronise si le parent reçoit une nouvelle prop (revalidation Next
+  // après une action ailleurs) — pattern React "adjust state on prop
+  // change" dans le corps du render, pas un effect (évite un rendu de plus).
+  if (packsCount !== prevPacksCount) {
+    setPrevPacksCount(packsCount);
+    setPacks(packsCount);
+  }
+
+  const handlePackChange = (delta: 1 | -1) => {
+    startPacksTransition(async () => {
+      const action = delta === 1 ? ajouterPackAction : retirerPackAction;
+      const res = await action({ caisseId, membreId });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setPacks((p) => p + delta);
+    });
+  };
 
   const onOpenChange = (next: boolean) => {
     setOpen(next);
@@ -116,6 +148,33 @@ export function MembreDetteDialog({
               >
                 {formatSolde(soldeCentimes)}
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {packs} pack{packs > 1 ? "s" : ""}
+              </span>
+              {canEditPacks && (
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={packsPending || packs <= 0}
+                    onClick={() => handlePackChange(-1)}
+                    aria-label="Retirer un pack"
+                    className="h-6 w-6 rounded-md border border-zinc-300 text-sm text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    disabled={packsPending}
+                    onClick={() => handlePackChange(1)}
+                    aria-label="Ajouter un pack"
+                    className="h-6 w-6 rounded-md border border-zinc-300 text-sm text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

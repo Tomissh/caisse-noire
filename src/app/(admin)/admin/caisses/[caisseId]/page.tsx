@@ -35,7 +35,6 @@ import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
 import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
 import { DetteCard } from "./_components/dette-card";
-import { PacksSection } from "./_components/packs-section";
 import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-dialog";
 import { NouveauPaiementDialog } from "./ecritures/_components/nouveau-paiement-dialog";
 import { NouveauRetraitDialog } from "./ecritures/_components/nouveau-retrait-dialog";
@@ -155,15 +154,21 @@ export default async function CaisseDashboardPage({
     montantVariable: m.montant_variable,
   }));
 
-  // Dettes : deux requêtes séparées (membres + v_membre_situation) fusionnées
-  // côté client, plutôt qu'un embed PostgREST qui échoue silencieusement
-  // (une vue n'expose pas de clé étrangère vers `membres`). Solde = cumul
-  // paiements − amendes (v_membre_situation) ; triées du plus endetté (solde
-  // le plus négatif) au plus créditeur. Les membres désactivés n'apparaissent
-  // plus que dans la page de gestion des membres.
+  // Dettes : requêtes séparées (membres + v_membre_situation + v_membre_packs)
+  // fusionnées côté client, plutôt qu'un embed PostgREST qui échoue
+  // silencieusement (une vue n'expose pas de clé étrangère vers `membres`).
+  // Solde = cumul paiements − amendes (v_membre_situation) ; triées du plus
+  // endetté (solde le plus négatif) au plus créditeur. Les membres désactivés
+  // n'apparaissent plus que dans la page de gestion des membres. Le compteur
+  // de packs (v_membre_packs) est affiché/modifiable directement sur la
+  // carte et le popup — pas de section dédiée séparée.
   const soldeByMembreId = new Map<string, number>();
   for (const r of situationsRes.data ?? []) {
     if (r.membre_id) soldeByMembreId.set(r.membre_id, r.solde_centimes ?? 0);
+  }
+  const packsByMembreId = new Map<string, number>();
+  for (const r of packsRes.data ?? []) {
+    if (r.membre_id) packsByMembreId.set(r.membre_id, r.packs_count ?? 0);
   }
   const soldesParMembre = (membresRes.data ?? [])
     .filter((m) => m.actif)
@@ -171,6 +176,7 @@ export default async function CaisseDashboardPage({
       membreId: m.id,
       nom: m.nom,
       solde: soldeByMembreId.get(m.id) ?? 0,
+      packs: packsByMembreId.get(m.id) ?? 0,
     }))
     .sort((a, b) => a.solde - b.solde);
 
@@ -201,22 +207,6 @@ export default async function CaisseDashboardPage({
     montantCentimes: m.solde,
     avatarUrl: avatarUrlByMembreId.get(m.membreId) ?? null,
   }));
-
-  // Packs : compteur simple par membre actif, sans montant. Deux requêtes
-  // séparées fusionnées côté client, même raison que Dettes (une vue
-  // n'expose pas de clé étrangère vers `membres` pour PostgREST).
-  const packsByMembreId = new Map<string, number>();
-  for (const r of packsRes.data ?? []) {
-    if (r.membre_id) packsByMembreId.set(r.membre_id, r.packs_count ?? 0);
-  }
-  const packsRows = (membresRes.data ?? [])
-    .filter((m) => m.actif)
-    .map((m) => ({
-      membreId: m.id,
-      nom: m.nom,
-      count: packsByMembreId.get(m.id) ?? 0,
-    }))
-    .sort((a, b) => a.nom.localeCompare(b.nom));
 
   // Récapitulatif mensuel — membres désactivés exclus (visibles uniquement
   // dans la page de gestion des membres).
@@ -376,6 +366,7 @@ export default async function CaisseDashboardPage({
                   membreId={m.membreId}
                   nom={m.nom}
                   soldeCentimes={m.solde}
+                  packsCount={m.packs}
                   avatarUrl={avatarUrlByMembreId.get(m.membreId) ?? null}
                 />
               ))}
@@ -457,12 +448,6 @@ export default async function CaisseDashboardPage({
               </table>
             </div>
           )}
-        </section>
-
-        {/* Packs ----------------------------------------------------------- */}
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Packs</h2>
-          <PacksSection caisseId={caisseId} rows={packsRows} />
         </section>
 
         {/* Dernières écritures ----------------------------------------- */}
