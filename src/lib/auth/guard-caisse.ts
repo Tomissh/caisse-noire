@@ -3,10 +3,16 @@
 //
 // notFound() en cas d'absence d'accès plutôt que 403, pour ne pas laisser
 // deviner l'existence de la caisse.
+//
+// Mémoïsé via React cache() (clé = caisseId) : le layout caisse ET la page
+// appellent tous deux ce guard pour la même requête — un seul aller-retour
+// Supabase réel, le second appel réutilise le résultat.
 
 import "server-only";
+import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "./session";
 import type { AdminRole } from "./roles";
 
 export type CaisseRow = {
@@ -32,11 +38,11 @@ export type CaisseAdminContext = {
   membreId: string | null;
 };
 
-export async function requireCaisseAdmin(caisseId: string): Promise<CaisseAdminContext> {
+export const requireCaisseAdmin = cache(async function requireCaisseAdmin(
+  caisseId: string,
+): Promise<CaisseAdminContext> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/login");
 
   const { data: caisse } = await supabase
@@ -69,4 +75,4 @@ export async function requireCaisseAdmin(caisseId: string): Promise<CaisseAdminC
   if (superAdmin) return { caisse, role: "super_admin", userId: user.id, membreId };
   if (adminRow) return { caisse, role: "admin", userId: user.id, membreId };
   notFound();
-}
+});

@@ -180,23 +180,44 @@ export default async function CaisseDashboardPage({
     }))
     .sort((a, b) => a.solde - b.solde);
 
-  // Photos de profil : une seule requête groupée (bucket privé "avatars")
-  // pour tous les membres affichés dans Dettes, réutilisée par le podium
-  // (top 3) — retombe sur l'avatar par défaut si absente/en erreur.
-  const { data: avatarSignedUrls } =
+  // Résolution emails déclarants pour les écritures du dashboard — calculé
+  // avant les deux requêtes ci-dessous pour pouvoir les lancer en parallèle.
+  const userIds = new Set<string>();
+  for (const a of amendesLastRes.data ?? []) {
+    if (a.declaree_par_user_id) userIds.add(a.declaree_par_user_id);
+  }
+  for (const p of paiementsLastRes.data ?? []) {
+    if (p.enregistre_par_user_id) userIds.add(p.enregistre_par_user_id);
+  }
+  for (const r of retraitsLastRes.data ?? []) {
+    if (r.enregistre_par_user_id) userIds.add(r.enregistre_par_user_id);
+  }
+
+  // Photos de profil (bucket privé "avatars", pour Dettes + podium) et
+  // emails des déclarants (Admin API) : deux requêtes indépendantes,
+  // lancées en parallèle plutôt qu'enchaînées.
+  const [{ data: avatarSignedUrls }, usersListRes] = await Promise.all([
     soldesParMembre.length > 0
-      ? await supabase.storage
+      ? supabase.storage
           .from("avatars")
           .createSignedUrls(
             soldesParMembre.map((m) => `${caisseId}/${m.membreId}/avatar`),
             3600,
           )
-      : { data: [] as { path: string | null; signedUrl: string | null }[] };
+      : Promise.resolve({ data: [] as { path: string | null; signedUrl: string | null }[] }),
+    userIds.size > 0
+      ? createAdminClient().auth.admin.listUsers({ perPage: 200 })
+      : Promise.resolve({ data: { users: [] as { id: string; email?: string }[] } }),
+  ]);
   const avatarUrlByMembreId = new Map<string, string>();
   for (const r of avatarSignedUrls ?? []) {
     if (!r.path || !r.signedUrl) continue;
     const membreId = r.path.split("/")[1];
     if (membreId) avatarUrlByMembreId.set(membreId, r.signedUrl);
+  }
+  const emailById = new Map<string, string>();
+  for (const u of usersListRes.data?.users ?? []) {
+    if (u.email) emailById.set(u.id, u.email);
   }
 
   // Podium des dettes : top 3 des soldes les plus bas (mêmes données que
@@ -218,26 +239,6 @@ export default async function CaisseDashboardPage({
   });
   const totalAPayer = recapRows.reduce((s, r) => s + r.amendes_mois_centimes, 0);
   const totalPaye = recapRows.reduce((s, r) => s + r.paiements_mois_suivant_centimes, 0);
-
-  // Résolution emails déclarants pour les écritures du dashboard
-  const userIds = new Set<string>();
-  for (const a of amendesLastRes.data ?? []) {
-    if (a.declaree_par_user_id) userIds.add(a.declaree_par_user_id);
-  }
-  for (const p of paiementsLastRes.data ?? []) {
-    if (p.enregistre_par_user_id) userIds.add(p.enregistre_par_user_id);
-  }
-  for (const r of retraitsLastRes.data ?? []) {
-    if (r.enregistre_par_user_id) userIds.add(r.enregistre_par_user_id);
-  }
-  const emailById = new Map<string, string>();
-  if (userIds.size > 0) {
-    const admin = createAdminClient();
-    const { data: usersList } = await admin.auth.admin.listUsers({ perPage: 200 });
-    for (const u of usersList?.users ?? []) {
-      if (u.email) emailById.set(u.id, u.email);
-    }
-  }
 
   const items: EcritureItem[] = [];
   for (const a of amendesLastRes.data ?? []) {

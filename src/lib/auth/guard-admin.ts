@@ -4,16 +4,21 @@
 // absente. Charge les rôles dérivés (super-admin, caisses où l'utilisateur
 // est créateur ou admin) et renvoie l'état complet à injecter dans le
 // AdminAuthProvider.
+//
+// Mémoïsé via React cache() : le layout (admin) et le layout super-admin
+// imbriqué appellent tous deux ce guard pour la même requête — un seul
+// aller-retour Supabase réel, le second appel réutilise le résultat.
 
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "./session";
 import type { AdminInitialState, CaisseAccess } from "./roles";
 
-export async function requireAdminUser(): Promise<AdminInitialState> {
+export const requireAdminUser = cache(async function requireAdminUser(): Promise<AdminInitialState> {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
+  const user = await getAuthUser();
   if (!user) redirect("/login");
 
   const [superAdminRes, caissesCreateurRes, adminsCaisseRes] = await Promise.all([
@@ -64,7 +69,7 @@ export async function requireAdminUser(): Promise<AdminInitialState> {
     isSuperAdmin: Boolean(superAdminRes.data),
     caissesAdmin: caisses,
   };
-}
+});
 
 /** Garde dédiée pour les segments super-admin. */
 export async function requireSuperAdmin(): Promise<AdminInitialState> {

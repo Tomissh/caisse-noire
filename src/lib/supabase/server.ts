@@ -2,14 +2,20 @@
 //
 // Lit/écrit les cookies de session via next/headers. Utilise la clé anonyme
 // donc soumis à la RLS.
+//
+// Mémoïsé via React cache() : un layout et une page (ou plusieurs layouts
+// imbriqués) qui appellent createClient() pendant le rendu d'une même
+// requête reçoivent la même instance, au lieu d'en recréer une à chaque
+// appel.
 
 import "server-only";
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./env";
 import type { Database } from "./database.types";
 
-export async function createClient() {
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -30,4 +36,4 @@ export async function createClient() {
       },
     },
   });
-}
+});
