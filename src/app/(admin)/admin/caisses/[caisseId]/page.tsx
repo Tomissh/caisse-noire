@@ -94,7 +94,7 @@ export default async function CaisseDashboardPage({
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null),
     supabase.from("retraits").select("montant_centimes").eq("caisse_id", caisseId),
-    supabase.from("membres").select("id, nom, actif").eq("caisse_id", caisseId),
+    supabase.from("membres").select("id, nom, actif, etudiant").eq("caisse_id", caisseId),
     supabase
       .from("motifs_amende")
       .select("id, libelle, montant_centimes, montant_variable")
@@ -143,17 +143,6 @@ export default async function CaisseDashboardPage({
   );
   const soldePhysique = soldeRes.data?.solde_centimes ?? totalPaiements - totalRetraits;
 
-  // Données pour les popups de saisie (amende/paiement) — actions rapides.
-  const membresActifs = (membresRes.data ?? [])
-    .filter((m) => m.actif)
-    .map((m) => ({ id: m.id, nom: m.nom }));
-  const motifsAmende = (motifsRes.data ?? []).map((m) => ({
-    id: m.id,
-    libelle: m.libelle,
-    montantEuros: centimesToEuros(m.montant_centimes),
-    montantVariable: m.montant_variable,
-  }));
-
   // Dettes : requêtes séparées (membres + v_membre_situation + v_membre_packs)
   // fusionnées côté client, plutôt qu'un embed PostgREST qui échoue
   // silencieusement (une vue n'expose pas de clé étrangère vers `membres`).
@@ -166,6 +155,25 @@ export default async function CaisseDashboardPage({
   for (const r of situationsRes.data ?? []) {
     if (r.membre_id) soldeByMembreId.set(r.membre_id, r.solde_centimes ?? 0);
   }
+
+  // Données pour les popups de saisie (amende/paiement) — actions rapides.
+  // soldeCentimes sert à préremplir le "montant total dû" pour les membres
+  // étudiants dans le formulaire de paiement.
+  const membresActifs = (membresRes.data ?? [])
+    .filter((m) => m.actif)
+    .map((m) => ({
+      id: m.id,
+      nom: m.nom,
+      etudiant: m.etudiant,
+      soldeCentimes: soldeByMembreId.get(m.id) ?? 0,
+    }));
+  const motifsAmende = (motifsRes.data ?? []).map((m) => ({
+    id: m.id,
+    libelle: m.libelle,
+    montantEuros: centimesToEuros(m.montant_centimes),
+    montantVariable: m.montant_variable,
+  }));
+
   const packsByMembreId = new Map<string, number>();
   for (const r of packsRes.data ?? []) {
     if (r.membre_id) packsByMembreId.set(r.membre_id, r.packs_count ?? 0);

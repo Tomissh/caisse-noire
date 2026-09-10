@@ -12,6 +12,7 @@ import { generatePassword } from "@/lib/caisse-code";
 const infoSchema = z.object({
   nom: z.string().trim().min(1, "Requis").max(60),
   actif: z.boolean(),
+  etudiant: z.boolean(),
 });
 type InfoValues = z.infer<typeof infoSchema>;
 
@@ -25,7 +26,7 @@ export function EditMembreForm({
   membre,
 }: {
   caisseId: string;
-  membre: { id: string; nom: string; actif: boolean };
+  membre: { id: string; nom: string; actif: boolean; etudiant: boolean };
 }) {
   const router = useRouter();
 
@@ -33,7 +34,7 @@ export function EditMembreForm({
   const [infoError, setInfoError] = useState<string | null>(null);
   const infoForm = useForm<InfoValues>({
     resolver: zodResolver(infoSchema),
-    defaultValues: { nom: membre.nom, actif: membre.actif },
+    defaultValues: { nom: membre.nom, actif: membre.actif, etudiant: membre.etudiant },
   });
 
   const onSubmitInfo = async (values: InfoValues) => {
@@ -109,6 +110,19 @@ export function EditMembreForm({
           />
           Membre actif
         </label>
+
+        <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-zinc-300 dark:border-zinc-700"
+            {...infoForm.register("etudiant")}
+          />
+          Membre étudiant
+        </label>
+        <p className="-mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+          Ne paiera que la moitié (arrondie à l&apos;euro supérieur) du montant dû lors de la
+          saisie d&apos;un paiement.
+        </p>
 
         {infoError && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">

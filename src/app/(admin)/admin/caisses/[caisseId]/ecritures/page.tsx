@@ -69,10 +69,10 @@ export default async function EcrituresPage({
     .order("nom");
 
   // Membres actifs + motifs — pour les popups de saisie (amende/paiement)
-  const [membresActifsRes, motifsRes] = await Promise.all([
+  const [membresActifsRes, motifsRes, situationRes] = await Promise.all([
     supabase
       .from("membres")
-      .select("id, nom")
+      .select("id, nom, etudiant")
       .eq("caisse_id", caisseId)
       .eq("actif", true)
       .order("nom"),
@@ -82,8 +82,17 @@ export default async function EcrituresPage({
       .eq("caisse_id", caisseId)
       .eq("actif", true)
       .order("libelle"),
+    // Solde actuel par membre — sert à préremplir le "montant total dû"
+    // affiché dans le formulaire de paiement pour les membres étudiants.
+    supabase.from("v_membre_situation").select("membre_id, solde_centimes").eq("caisse_id", caisseId),
   ]);
-  const membresActifs = membresActifsRes.data ?? [];
+  const soldeParMembre = new Map(
+    (situationRes.data ?? []).map((s) => [s.membre_id, s.solde_centimes ?? 0]),
+  );
+  const membresActifs = (membresActifsRes.data ?? []).map((m) => ({
+    ...m,
+    soldeCentimes: soldeParMembre.get(m.id) ?? 0,
+  }));
   const motifsAmende = (motifsRes.data ?? []).map((m) => ({
     id: m.id,
     libelle: m.libelle,

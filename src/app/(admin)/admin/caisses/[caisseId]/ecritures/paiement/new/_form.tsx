@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useMemo, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { recordPaiementAction } from "../../_actions";
+import { eurosToCentimes, formatEuros } from "@/lib/format";
 
 // Moyen de paiement : toujours espèces (pas d'autre moyen accepté par la
 // caisse), donc pas de choix à faire à la saisie.
@@ -25,7 +26,7 @@ export function PaiementForm({
   onCancel,
 }: {
   caisseId: string;
-  membres: { id: string; nom: string }[];
+  membres: { id: string; nom: string; etudiant: boolean; soldeCentimes: number }[];
   onSuccess?: () => void;
   onCancel?: () => void;
 }) {
@@ -34,11 +35,34 @@ export function PaiementForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { membreId: "", montantEuros: 10 },
   });
+
+  const membreId = useWatch({ control, name: "membreId" });
+  const montantEuros = useWatch({ control, name: "montantEuros" });
+  const membreSelectionne = membres.find((m) => m.id === membreId) ?? null;
+
+  // Montant total dû = dette actuelle du membre (solde négatif), calculée
+  // côté serveur via v_membre_situation. Purement informatif — voir
+  // supabase/migrations/20260910120000_membres_etudiant.sql.
+  const infoEtudiant = useMemo(() => {
+    if (!membreSelectionne?.etudiant) return null;
+    const montantDuCentimes = Math.max(0, -membreSelectionne.soldeCentimes);
+    // Moitié arrondie à l'euro supérieur (tous les montants du projet sont
+    // en euros entiers, cf. lib/format.ts).
+    const montantReelDuCentimes = Math.ceil(montantDuCentimes / 200) * 100;
+    const montantPayeCentimes =
+      typeof montantEuros === "number" && Number.isFinite(montantEuros)
+        ? eurosToCentimes(montantEuros)
+        : null;
+    const ecartCentimes =
+      montantPayeCentimes !== null ? montantPayeCentimes - montantReelDuCentimes : null;
+    return { montantDuCentimes, montantReelDuCentimes, ecartCentimes };
+  }, [membreSelectionne, montantEuros]);
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -96,6 +120,44 @@ export function PaiementForm({
           <p className="text-xs text-red-600 dark:text-red-400">{errors.montantEuros.message}</p>
         )}
       </div>
+
+      {infoEtudiant && (
+        <div className="space-y-1.5 rounded-md border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700">
+          <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            Membre étudiant — paie la moitié du montant dû
+          </p>
+          <div className="flex justify-between">
+            <span className="text-zinc-600 dark:text-zinc-400">Montant total dû</span>
+            <span className="font-medium text-zinc-900 dark:text-zinc-50">
+              {formatEuros(infoEtudiant.montantDuCentimes)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-600 dark:text-zinc-400">
+              Montant réellement dû (moitié, arrondi)
+            </span>
+            <span className="font-medium text-zinc-900 dark:text-zinc-50">
+              {formatEuros(infoEtudiant.montantReelDuCentimes)}
+            </span>
+          </div>
+          {infoEtudiant.ecartCentimes !== null && (
+            <div className="flex justify-between border-t border-zinc-200 pt-1.5 dark:border-zinc-800">
+              <span className="text-zinc-600 dark:text-zinc-400">
+                {infoEtudiant.ecartCentimes >= 0 ? "Avance" : "Reste à payer"}
+              </span>
+              <span
+                className={
+                  infoEtudiant.ecartCentimes >= 0
+                    ? "font-medium text-emerald-600 dark:text-emerald-400"
+                    : "font-medium text-amber-600 dark:text-amber-400"
+                }
+              >
+                {formatEuros(Math.abs(infoEtudiant.ecartCentimes))}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {serverError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">

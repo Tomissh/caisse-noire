@@ -3,7 +3,7 @@
 // Server Actions pour la gestion des membres d'une caisse.
 //   - createMembreAction : INSERT + hash bcryptjs cost 12 (cohérent avec
 //     l'Edge Function set-password-membre)
-//   - updateMembreAction : nom, actif
+//   - updateMembreAction : nom, actif, etudiant
 //   - resetMembrePasswordAction : remplace le password_hash (admin pose
 //     directement un nouveau mdp, à transmettre au membre)
 //
@@ -29,12 +29,14 @@ const createMembreSchema = z.object({
   caisseId: uuid,
   nom: personName,
   password,
+  etudiant: z.boolean(),
 });
 
 export async function createMembreAction(input: {
   caisseId: string;
   nom: string;
   password: string;
+  etudiant: boolean;
 }): Promise<Result> {
   const parsed = createMembreSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Champs invalides" };
@@ -46,6 +48,7 @@ export async function createMembreAction(input: {
     caisse_id: parsed.data.caisseId,
     nom: parsed.data.nom,
     password_hash: hash,
+    etudiant: parsed.data.etudiant,
   });
 
   if (error) {
@@ -64,6 +67,7 @@ const updateMembreSchema = z.object({
   caisseId: uuid,
   nom: personName,
   actif: z.boolean(),
+  etudiant: z.boolean(),
 });
 
 export async function updateMembreAction(input: {
@@ -71,6 +75,7 @@ export async function updateMembreAction(input: {
   caisseId: string;
   nom: string;
   actif: boolean;
+  etudiant: boolean;
 }): Promise<Result> {
   const parsed = updateMembreSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Champs invalides" };
@@ -81,6 +86,7 @@ export async function updateMembreAction(input: {
     .update({
       nom: parsed.data.nom,
       actif: parsed.data.actif,
+      etudiant: parsed.data.etudiant,
     })
     .eq("id", parsed.data.membreId);
 

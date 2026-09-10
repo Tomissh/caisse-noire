@@ -327,6 +327,7 @@ export type Database = {
           actif: boolean
           caisse_id: string
           created_at: string
+          etudiant: boolean
           id: string
           nom: string
           password_hash: string | null
@@ -336,6 +337,7 @@ export type Database = {
           actif?: boolean
           caisse_id: string
           created_at?: string
+          etudiant?: boolean
           id?: string
           nom: string
           password_hash?: string | null
@@ -345,6 +347,7 @@ export type Database = {
           actif?: boolean
           caisse_id?: string
           created_at?: string
+          etudiant?: boolean
           id?: string
           nom?: string
           password_hash?: string | null

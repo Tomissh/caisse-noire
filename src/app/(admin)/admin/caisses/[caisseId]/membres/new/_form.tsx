@@ -12,6 +12,7 @@ import { generatePassword } from "@/lib/caisse-code";
 const schema = z.object({
   nom: z.string().trim().min(1, "Requis").max(60),
   password: z.string().min(6, "≥ 6 caractères").max(100),
+  etudiant: z.boolean(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -26,7 +27,7 @@ export function NewMembreForm({ caisseId }: { caisseId: string }) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nom: "", password: "" },
+    defaultValues: { nom: "", password: "", etudiant: false },
   });
 
   const onGenerate = () => {
@@ -97,6 +98,19 @@ export function NewMembreForm({ caisseId }: { caisseId: string }) {
           Visible en clair pour que vous puissiez le copier et le transmettre au membre.
         </p>
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <input
+          type="checkbox"
+          className="size-4 rounded border-zinc-300 dark:border-zinc-700"
+          {...register("etudiant")}
+        />
+        Membre étudiant
+      </label>
+      <p className="-mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+        Ne paiera que la moitié (arrondie à l&apos;euro supérieur) du montant dû lors de la
+        saisie d&apos;un paiement.
+      </p>
 
       {serverError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">

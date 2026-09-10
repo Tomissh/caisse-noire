@@ -19,7 +19,7 @@ export default async function EditMembrePage({
   const supabase = await createClient();
   const { data: membre } = await supabase
     .from("membres")
-    .select("id, nom, actif")
+    .select("id, nom, actif, etudiant")
     .eq("id", membreId)
     .eq("caisse_id", caisseId)
     .maybeSingle();
