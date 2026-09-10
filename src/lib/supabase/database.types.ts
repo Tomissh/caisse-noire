@@ -127,6 +127,7 @@ export type Database = {
           montant_centimes: number
           motif_id: string | null
           motif_suppression: string | null
+          reduction_etudiant: boolean
           supprimee_at: string | null
           supprimee_par_user_id: string | null
         }
@@ -142,6 +143,7 @@ export type Database = {
           montant_centimes: number
           motif_id?: string | null
           motif_suppression?: string | null
+          reduction_etudiant?: boolean
           supprimee_at?: string | null
           supprimee_par_user_id?: string | null
         }
@@ -157,6 +159,7 @@ export type Database = {
           montant_centimes?: number
           motif_id?: string | null
           motif_suppression?: string | null
+          reduction_etudiant?: boolean
           supprimee_at?: string | null
           supprimee_par_user_id?: string | null
         }

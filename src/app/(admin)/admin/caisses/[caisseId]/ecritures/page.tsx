@@ -72,7 +72,7 @@ export default async function EcrituresPage({
   const [membresActifsRes, motifsRes] = await Promise.all([
     supabase
       .from("membres")
-      .select("id, nom")
+      .select("id, nom, etudiant")
       .eq("caisse_id", caisseId)
       .eq("actif", true)
       .order("nom"),

@@ -21,7 +21,7 @@ type MotifOption = {
   montantVariable: boolean;
 };
 
-type MembreOption = { id: string; nom: string };
+type MembreOption = { id: string; nom: string; etudiant: boolean };
 
 export function NouvelleAmendeDialog({
   caisseId,

@@ -159,7 +159,7 @@ export default async function CaisseDashboardPage({
   // Données pour les popups de saisie (amende/paiement) — actions rapides.
   const membresActifs = (membresRes.data ?? [])
     .filter((m) => m.actif)
-    .map((m) => ({ id: m.id, nom: m.nom }));
+    .map((m) => ({ id: m.id, nom: m.nom, etudiant: m.etudiant }));
   const motifsAmende = (motifsRes.data ?? []).map((m) => ({
     id: m.id,
     libelle: m.libelle,

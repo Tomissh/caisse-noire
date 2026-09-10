@@ -136,16 +136,14 @@ export function MembreDetteDialog({
               className="border-4 border-zinc-200 dark:border-zinc-700"
             />
             <div className="text-center">
-              <div className="flex items-center justify-center gap-1.5">
-                <div className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                  {nom}
-                </div>
-                {etudiant && (
-                  <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
-                    Étudiant
-                  </span>
-                )}
+              <div className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                {nom}
               </div>
+              {etudiant && (
+                <span className="mt-0.5 inline-block rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+                  Étudiant
+                </span>
+              )}
               <div
                 className={`font-mono text-sm font-bold ${
                   soldeCentimes > 0

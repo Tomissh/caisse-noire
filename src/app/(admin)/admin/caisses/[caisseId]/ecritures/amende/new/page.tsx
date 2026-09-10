@@ -29,7 +29,7 @@ export default async function NewAmendePage({
       .order("libelle"),
     supabase
       .from("membres")
-      .select("id, nom")
+      .select("id, nom, etudiant")
       .eq("caisse_id", caisseId)
       .eq("actif", true)
       .order("nom"),

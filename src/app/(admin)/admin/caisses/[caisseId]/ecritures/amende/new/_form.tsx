@@ -38,7 +38,7 @@ type MotifOption = {
   montantVariable: boolean;
 };
 
-type MembreOption = { id: string; nom: string };
+type MembreOption = { id: string; nom: string; etudiant: boolean };
 
 const rowSchema = z.object({
   membreId: z.string().min(1, "Sélectionnez un membre"),
@@ -46,6 +46,7 @@ const rowSchema = z.object({
   libelle: z.string().trim().min(1, "Libellé requis").max(120),
   montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
   jourMatch: z.boolean(),
+  reductionEtudiant: z.boolean(),
 });
 
 const schema = z.object({
@@ -54,7 +55,14 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 function emptyRow(): FormValues["rows"][number] {
-  return { membreId: "", motifSelection: FREE, libelle: "", montantEuros: 5, jourMatch: false };
+  return {
+    membreId: "",
+    motifSelection: FREE,
+    libelle: "",
+    montantEuros: 5,
+    jourMatch: false,
+    reductionEtudiant: false,
+  };
 }
 
 export function AmendeForm({
@@ -92,6 +100,7 @@ export function AmendeForm({
       montantEuros: r.montantEuros,
       membreId: r.membreId,
       jourMatch: r.jourMatch,
+      reductionEtudiant: r.reductionEtudiant,
     }));
 
     const res = await declareAmendesBatchAction({ caisseId, rows });
@@ -189,11 +198,17 @@ function AmendeRowFields({
   const motifSelection = useWatch({ control, name: `rows.${index}.motifSelection` });
   const montantEuros = useWatch({ control, name: `rows.${index}.montantEuros` });
   const jourMatch = useWatch({ control, name: `rows.${index}.jourMatch` });
+  const membreId = useWatch({ control, name: `rows.${index}.membreId` });
+  const reductionEtudiant = useWatch({ control, name: `rows.${index}.reductionEtudiant` });
 
   const selectedMotif = useMemo<MotifOption | null>(() => {
     if (motifSelection === FREE) return null;
     return motifs.find((m) => m.id === motifSelection) ?? null;
   }, [motifSelection, motifs]);
+
+  const selectedMembre = useMemo<MembreOption | null>(() => {
+    return membres.find((m) => m.id === membreId) ?? null;
+  }, [membreId, membres]);
 
   const locked = selectedMotif !== null && !selectedMotif.montantVariable;
 
@@ -315,6 +330,27 @@ function AmendeRowFields({
         {jourMatch && Number.isFinite(montantEuros) && (
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
             Montant final : {montantEuros * 2} €
+          </p>
+        )}
+      </div>
+
+      {/* Réduction étudiant --------------------------------------------- */}
+      <div className="space-y-1">
+        <label className="flex items-center gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            className="size-4"
+            {...register(`rows.${index}.reductionEtudiant`)}
+          />
+          <span className="text-zinc-700 dark:text-zinc-300">-50% étudiant</span>
+        </label>
+        {reductionEtudiant && (
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            {selectedMembre?.etudiant
+              ? "Cette amende comptera pour moitié dans le total dû du membre."
+              : selectedMembre
+                ? "Sans effet : ce membre n'est pas marqué étudiant."
+                : "Sans effet tant qu'aucun membre étudiant n'est sélectionné."}
           </p>
         )}
       </div>
