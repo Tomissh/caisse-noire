@@ -5,9 +5,11 @@
 // supabase/migrations/20260903120000_packs.sql.
 //
 // genererCotisationMoisAction : déclenchement manuel de la cotisation
-// mensuelle (pas de cron — voir 20260910170000_cotisation_manuelle.sql).
-// La RPC generer_cotisations_mois vérifie elle-même l'autorisation
-// (is_admin_of + caisse ouverte) ; refuse un mois pas encore clos.
+// mensuelle, y compris pour le mois en cours (pas de cron — voir
+// 20260910170000_cotisation_manuelle.sql et
+// 20260910180000_cotisation_mois_en_cours.sql). La RPC
+// generer_cotisations_mois vérifie elle-même l'autorisation (is_admin_of +
+// caisse ouverte) et reste idempotente (une seule génération par mois).
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";

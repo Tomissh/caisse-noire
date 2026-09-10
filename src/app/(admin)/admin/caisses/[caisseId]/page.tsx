@@ -405,7 +405,7 @@ export default async function CaisseDashboardPage({
               }))}
             />
             {ctx.caisse.cotisation_active && (
-              <GenererCotisationButton caisseId={caisseId} mois={mois} />
+              <GenererCotisationButton caisseId={caisseId} mois={currentMonthDefault()} />
             )}
           </div>
           {recapRows.length === 0 ? (
