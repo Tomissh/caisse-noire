@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { recordPaiementAction } from "../../_actions";
-import { eurosToCentimes, formatEuros } from "@/lib/format";
 
 // Moyen de paiement : toujours espèces (pas d'autre moyen accepté par la
 // caisse), donc pas de choix à faire à la saisie.
@@ -26,7 +25,7 @@ export function PaiementForm({
   onCancel,
 }: {
   caisseId: string;
-  membres: { id: string; nom: string; etudiant: boolean }[];
+  membres: { id: string; nom: string }[];
   onSuccess?: () => void;
   onCancel?: () => void;
 }) {
@@ -35,51 +34,11 @@ export function PaiementForm({
   const {
     register,
     handleSubmit,
-    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { membreId: "", montantEuros: 10 },
   });
-
-  const membreId = useWatch({ control, name: "membreId" });
-  const montantEuros = useWatch({ control, name: "montantEuros" });
-  const membreSelectionne = membres.find((m) => m.id === membreId) ?? null;
-
-  // Montant total dû saisi à la main par l'admin (pas de préremplissage
-  // automatique) : le solde cumulé du membre mélange souvent plusieurs
-  // périodes (ex. règlement des amendes d'août alors que de nouvelles
-  // amendes sont déjà tombées en septembre), donc un calcul automatique
-  // fausserait le montant à régler pour la période concernée. Purement
-  // informatif — voir supabase/migrations/20260910120000_membres_etudiant.sql
-  // et 20260910130000_v_membre_situation_reduction_etudiant.sql.
-  const [montantDuEuros, setMontantDuEuros] = useState<number | "">("");
-  // Reset le montant dû saisi quand on change de membre (pattern "adjusting
-  // state during render" plutôt qu'un useEffect, cf. règle
-  // react-hooks/set-state-in-effect).
-  const [dernierMembreId, setDernierMembreId] = useState(membreId);
-  if (membreId !== dernierMembreId) {
-    setDernierMembreId(membreId);
-    setMontantDuEuros("");
-  }
-
-  const infoEtudiant = useMemo(() => {
-    if (!membreSelectionne?.etudiant) return null;
-    if (montantDuEuros === "" || !Number.isFinite(montantDuEuros)) {
-      return { montantReelDuCentimes: null, ecartCentimes: null };
-    }
-    const montantDuCentimes = eurosToCentimes(montantDuEuros);
-    // Moitié arrondie à l'euro supérieur (tous les montants du projet sont
-    // en euros entiers, cf. lib/format.ts).
-    const montantReelDuCentimes = Math.ceil(montantDuCentimes / 200) * 100;
-    const montantPayeCentimes =
-      typeof montantEuros === "number" && Number.isFinite(montantEuros)
-        ? eurosToCentimes(montantEuros)
-        : null;
-    const ecartCentimes =
-      montantPayeCentimes !== null ? montantPayeCentimes - montantReelDuCentimes : null;
-    return { montantReelDuCentimes, ecartCentimes };
-  }, [membreSelectionne, montantDuEuros, montantEuros]);
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -137,61 +96,6 @@ export function PaiementForm({
           <p className="text-xs text-red-600 dark:text-red-400">{errors.montantEuros.message}</p>
         )}
       </div>
-
-      {membreSelectionne?.etudiant && (
-        <div className="space-y-3 rounded-md border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700">
-          <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-            Membre étudiant — paie la moitié du montant dû
-          </p>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              Montant total dû (pour la période réglée)
-            </label>
-            <input
-              type="number"
-              step={1}
-              min={0}
-              value={montantDuEuros}
-              onChange={(e) =>
-                setMontantDuEuros(e.target.value === "" ? "" : Number(e.target.value))
-              }
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-            />
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              À saisir à la main : le solde du membre peut mélanger plusieurs périodes (ex.
-              amendes plus récentes non concernées par ce règlement).
-            </p>
-          </div>
-
-          {infoEtudiant?.montantReelDuCentimes != null && (
-            <div className="flex justify-between">
-              <span className="text-zinc-600 dark:text-zinc-400">
-                Montant réellement dû (moitié, arrondi)
-              </span>
-              <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                {formatEuros(infoEtudiant.montantReelDuCentimes)}
-              </span>
-            </div>
-          )}
-          {infoEtudiant?.ecartCentimes != null && (
-            <div className="flex justify-between border-t border-zinc-200 pt-1.5 dark:border-zinc-800">
-              <span className="text-zinc-600 dark:text-zinc-400">
-                {infoEtudiant.ecartCentimes >= 0 ? "Avance" : "Reste à payer"}
-              </span>
-              <span
-                className={
-                  infoEtudiant.ecartCentimes >= 0
-                    ? "font-medium text-emerald-600 dark:text-emerald-400"
-                    : "font-medium text-amber-600 dark:text-amber-400"
-                }
-              >
-                {formatEuros(Math.abs(infoEtudiant.ecartCentimes))}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
 
       {serverError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">

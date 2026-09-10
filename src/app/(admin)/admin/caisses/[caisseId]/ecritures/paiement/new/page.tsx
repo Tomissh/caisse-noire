@@ -18,7 +18,7 @@ export default async function NewPaiementPage({
   const supabase = await createClient();
   const { data: membres } = await supabase
     .from("membres")
-    .select("id, nom, etudiant")
+    .select("id, nom")
     .eq("caisse_id", caisseId)
     .eq("actif", true)
     .order("nom");

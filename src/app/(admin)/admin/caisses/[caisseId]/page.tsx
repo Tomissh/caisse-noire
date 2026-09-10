@@ -94,7 +94,7 @@ export default async function CaisseDashboardPage({
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null),
     supabase.from("retraits").select("montant_centimes").eq("caisse_id", caisseId),
-    supabase.from("membres").select("id, nom, actif, etudiant").eq("caisse_id", caisseId),
+    supabase.from("membres").select("id, nom, actif").eq("caisse_id", caisseId),
     supabase
       .from("motifs_amende")
       .select("id, libelle, montant_centimes, montant_variable")
@@ -159,7 +159,7 @@ export default async function CaisseDashboardPage({
   // Données pour les popups de saisie (amende/paiement) — actions rapides.
   const membresActifs = (membresRes.data ?? [])
     .filter((m) => m.actif)
-    .map((m) => ({ id: m.id, nom: m.nom, etudiant: m.etudiant }));
+    .map((m) => ({ id: m.id, nom: m.nom }));
   const motifsAmende = (motifsRes.data ?? []).map((m) => ({
     id: m.id,
     libelle: m.libelle,
