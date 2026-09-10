@@ -110,7 +110,7 @@ export default async function CaisseDashboardPage({
     supabase
       .from("amendes")
       .select(
-        "id, caisse_id, membre_id, libelle, montant_centimes, jour_match, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(nom)",
+        "id, caisse_id, membre_id, libelle, montant_centimes, jour_match, reduction_etudiant, declaree_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(nom)",
       )
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null)
@@ -255,6 +255,7 @@ export default async function CaisseDashboardPage({
       membreNom: m ? m.nom : null,
       moyen: null,
       jourMatch: a.jour_match,
+      reductionEtudiant: a.reduction_etudiant,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? a.declaree_par_user_id.slice(0, 8),
       supprimeeAt: a.supprimee_at,
       motifSuppression: a.motif_suppression,
@@ -273,6 +274,7 @@ export default async function CaisseDashboardPage({
       membreNom: m ? m.nom : null,
       moyen: p.moyen,
       jourMatch: false,
+      reductionEtudiant: false,
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? p.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: p.supprimee_at,
       motifSuppression: p.motif_suppression,
@@ -290,6 +292,7 @@ export default async function CaisseDashboardPage({
       membreNom: null,
       moyen: null,
       jourMatch: false,
+      reductionEtudiant: false,
       acteurEmail: emailById.get(r.enregistre_par_user_id) ?? r.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: null,
       motifSuppression: null,

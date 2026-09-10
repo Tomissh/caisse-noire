@@ -118,9 +118,11 @@ export async function GET(
   // ------------------------------------------------------------------------
   // KPIs (somme des écritures NON supprimées — indépendant du include_deleted)
   // ------------------------------------------------------------------------
-  const totalAmendes = (amendesRes.data ?? [])
-    .filter((r) => r.supprimee_at === null)
-    .reduce((s, r) => s + r.montant_centimes, 0);
+  // totalAmendes n'est PAS recalculé depuis le montant brut des amendes : il
+  // doit rester égal à la somme des totaux par membre (v_membre_situation),
+  // qui applique la réduction étudiant par amende (cf. migration
+  // 20260910150000) — sinon ce KPI diverge du tableau "par membre" du même
+  // PDF pour toute caisse ayant des amendes réduites.
   const totalPaiements = (paiementsRes.data ?? [])
     .filter((r) => r.supprimee_at === null)
     .reduce((s, r) => s + r.montant_centimes, 0);
@@ -239,7 +241,7 @@ export async function GET(
     },
     kpis: {
       soldeCentimes: soldePhysique,
-      totalAmendesCentimes: totalAmendes,
+      totalAmendesCentimes: membres.reduce((s, m) => s + m.totalAmendesCentimes, 0),
       totalPaiementsCentimes: totalPaiements,
       totalRetraitsCentimes: totalRetraits,
       nbMembresActifs: membresActifsRes.count ?? 0,

@@ -32,6 +32,7 @@ type AmendeRow = {
   libelle: string;
   montant_centimes: number;
   jour_match: boolean;
+  reduction_etudiant: boolean;
   created_at: string;
 };
 
@@ -103,7 +104,7 @@ export function MembreDetteDialog({
     setError(null);
     supabase
       .from("amendes")
-      .select("id, libelle, montant_centimes, jour_match, created_at")
+      .select("id, libelle, montant_centimes, jour_match, reduction_etudiant, created_at")
       .eq("caisse_id", caisseId)
       .eq("membre_id", membreId)
       .is("supprimee_at", null)
@@ -208,6 +209,11 @@ export function MembreDetteDialog({
                       {a.jour_match && (
                         <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                           JDM
+                        </span>
+                      )}
+                      {a.reduction_etudiant && (
+                        <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+                          -50% étudiant
                         </span>
                       )}
                     </span>

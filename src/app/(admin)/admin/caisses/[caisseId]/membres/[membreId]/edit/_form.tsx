@@ -120,8 +120,9 @@ export function EditMembreForm({
           Membre étudiant
         </label>
         <p className="-mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-          Ne paiera que la moitié (arrondie à l&apos;euro supérieur) du montant dû lors de la
-          saisie d&apos;un paiement.
+          Les amendes déclarées avec l&apos;option « -50% étudiant » compteront pour moitié
+          (arrondi à l&apos;euro supérieur) dans son total dû. Les autres amendes restent
+          pleines.
         </p>
 
         {infoError && (

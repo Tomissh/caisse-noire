@@ -35,6 +35,7 @@ type Amende = {
   libelle: string;
   montant_centimes: number;
   jour_match: boolean;
+  reduction_etudiant: boolean;
   created_at: string;
 };
 
@@ -126,7 +127,7 @@ export default function MembreDashboardPage() {
               .maybeSingle(),
             supabase
               .from("amendes")
-              .select("id, libelle, montant_centimes, jour_match, created_at")
+              .select("id, libelle, montant_centimes, jour_match, reduction_etudiant, created_at")
               .eq("caisse_id", claims.caisse_id)
               .eq("membre_id", claims.membre_id)
               .is("supprimee_at", null)
@@ -342,7 +343,10 @@ export default function MembreDashboardPage() {
             primary: a.libelle,
             secondary: formatDate(a.created_at),
             amount: -a.montant_centimes,
-            badge: a.jour_match ? "JDM" : null,
+            badge:
+              [a.jour_match ? "JDM" : null, a.reduction_etudiant ? "-50% étudiant" : null]
+                .filter(Boolean)
+                .join(" · ") || null,
           }))}
           fullCount={data.amendes.length}
         />

@@ -20,6 +20,7 @@ export type EcritureItem = {
   membreNom: string | null;
   moyen: "especes" | "virement" | "autre" | null;
   jourMatch: boolean;
+  reductionEtudiant: boolean;
   acteurEmail: string;
   supprimeeAt: string | null;
   motifSuppression: string | null;
@@ -120,6 +121,11 @@ export function EcrituresList({
                       jour de match ×2
                     </span>
                   )}
+                  {it.reductionEtudiant && (
+                    <span className="ml-2 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+                      -50% étudiant
+                    </span>
+                  )}
                   {isDeleted && (
                     <span className="ml-2 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
                       supprimée
@@ -170,6 +176,7 @@ export function EcrituresList({
                         </div>
                       )}
                       {it.jourMatch && <div>Jour de match ×2</div>}
+                      {it.reductionEtudiant && <div>-50% étudiant</div>}
                     </>
                   )}
                   {isDeleted && (
