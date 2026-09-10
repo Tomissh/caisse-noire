@@ -3,6 +3,11 @@
 // Server Actions des packs — compteur simple par membre (ajout/retrait),
 // aucun montant, ledger immuable (delta +1/-1). Voir
 // supabase/migrations/20260903120000_packs.sql.
+//
+// genererCotisationMoisAction : déclenchement manuel de la cotisation
+// mensuelle (pas de cron — voir 20260910170000_cotisation_manuelle.sql).
+// La RPC generer_cotisations_mois vérifie elle-même l'autorisation
+// (is_admin_of + caisse ouverte) ; refuse un mois pas encore clos.
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -52,4 +57,34 @@ export async function retirerPackAction(input: {
   membreId: string;
 }): Promise<Result> {
   return recordPackMouvement(input, -1);
+}
+
+const genererCotisationSchema = z.object({
+  caisseId: z.uuid(),
+  mois: z.string().regex(/^\d{4}-\d{2}$/, "Mois invalide (YYYY-MM)"),
+});
+
+export async function genererCotisationMoisAction(input: {
+  caisseId: string;
+  mois: string; // "YYYY-MM"
+}): Promise<Result & { count?: number }> {
+  const parsed = genererCotisationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Champs invalides" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Non authentifié" };
+
+  const { data, error } = await supabase.rpc("generer_cotisations_mois", {
+    p_caisse_id: parsed.data.caisseId,
+    p_mois: `${parsed.data.mois}-01`,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/caisses/${parsed.data.caisseId}`);
+  return { ok: true, count: data ?? 0 };
 }

@@ -33,6 +33,7 @@ import type { EcritureItem } from "./ecritures/_components/list";
 import { EcrituresList } from "./ecritures/_components/list";
 import { MonthNav } from "./_components/month-nav";
 import { ClassementPanel } from "./_components/classement-panel";
+import { GenererCotisationButton } from "./_components/generer-cotisation-button";
 import { PodiumPayeurs } from "@/components/features/PodiumPayeurs";
 import { DetteCard } from "./_components/dette-card";
 import { NouvelleAmendeDialog } from "./ecritures/_components/nouvelle-amende-dialog";
@@ -396,12 +397,17 @@ export default async function CaisseDashboardPage({
             </div>
           </header>
 
-          <ClassementPanel
-            rows={recapRows.map((r) => ({
-              nom: r.nom,
-              montantAPayerCentimes: r.amendes_mois_centimes,
-            }))}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <ClassementPanel
+              rows={recapRows.map((r) => ({
+                nom: r.nom,
+                montantAPayerCentimes: r.amendes_mois_centimes,
+              }))}
+            />
+            {ctx.caisse.cotisation_active && (
+              <GenererCotisationButton caisseId={caisseId} mois={mois} />
+            )}
+          </div>
           {recapRows.length === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
               Aucun membre.
