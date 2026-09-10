@@ -16,22 +16,12 @@ export default async function NewPaiementPage({
   }
 
   const supabase = await createClient();
-  const [{ data: membresData }, { data: situations }] = await Promise.all([
-    supabase
-      .from("membres")
-      .select("id, nom, etudiant")
-      .eq("caisse_id", caisseId)
-      .eq("actif", true)
-      .order("nom"),
-    supabase.from("v_membre_situation").select("membre_id, solde_centimes").eq("caisse_id", caisseId),
-  ]);
-  const soldeByMembreId = new Map(
-    (situations ?? []).map((s) => [s.membre_id, s.solde_centimes ?? 0]),
-  );
-  const membres = (membresData ?? []).map((m) => ({
-    ...m,
-    soldeCentimes: soldeByMembreId.get(m.id) ?? 0,
-  }));
+  const { data: membres } = await supabase
+    .from("membres")
+    .select("id, nom, etudiant")
+    .eq("caisse_id", caisseId)
+    .eq("actif", true)
+    .order("nom");
 
   return (
     <main className="flex-1 px-6 py-8">
@@ -51,7 +41,7 @@ export default async function NewPaiementPage({
             dette : l&apos;excédent reste en avance.
           </p>
         </header>
-        <PaiementForm caisseId={caisseId} membres={membres} />
+        <PaiementForm caisseId={caisseId} membres={membres ?? []} />
       </div>
     </main>
   );

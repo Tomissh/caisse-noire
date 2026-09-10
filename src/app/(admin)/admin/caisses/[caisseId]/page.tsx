@@ -157,16 +157,9 @@ export default async function CaisseDashboardPage({
   }
 
   // Données pour les popups de saisie (amende/paiement) — actions rapides.
-  // soldeCentimes sert à préremplir le "montant total dû" pour les membres
-  // étudiants dans le formulaire de paiement.
   const membresActifs = (membresRes.data ?? [])
     .filter((m) => m.actif)
-    .map((m) => ({
-      id: m.id,
-      nom: m.nom,
-      etudiant: m.etudiant,
-      soldeCentimes: soldeByMembreId.get(m.id) ?? 0,
-    }));
+    .map((m) => ({ id: m.id, nom: m.nom, etudiant: m.etudiant }));
   const motifsAmende = (motifsRes.data ?? []).map((m) => ({
     id: m.id,
     libelle: m.libelle,
