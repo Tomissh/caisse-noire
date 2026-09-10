@@ -12,6 +12,7 @@ const schema = z.object({
   libelle: z.string().trim().min(1, "Requis").max(120),
   montantEuros: z.number().int("Euros entiers uniquement").positive("> 0").max(10_000),
   montantVariable: z.boolean(),
+  reductionEtudiant: z.boolean(),
   actif: z.boolean(),
 });
 type FormValues = z.infer<typeof schema>;
@@ -26,6 +27,7 @@ type Props =
         libelle: string;
         montantEuros: number;
         montantVariable: boolean;
+        reductionEtudiant: boolean;
         actif: boolean;
       };
     };
@@ -40,9 +42,16 @@ export function MotifForm(props: Props) {
           libelle: props.initial.libelle,
           montantEuros: props.initial.montantEuros,
           montantVariable: props.initial.montantVariable,
+          reductionEtudiant: props.initial.reductionEtudiant,
           actif: props.initial.actif,
         }
-      : { libelle: "", montantEuros: 5, montantVariable: false, actif: true };
+      : {
+          libelle: "",
+          montantEuros: 5,
+          montantVariable: false,
+          reductionEtudiant: false,
+          actif: true,
+        };
 
   const {
     register,
@@ -62,6 +71,7 @@ export function MotifForm(props: Props) {
             libelle: values.libelle,
             montantEuros: values.montantEuros,
             montantVariable: values.montantVariable,
+            reductionEtudiant: values.reductionEtudiant,
           })
         : await updateMotifAction({
             motifId: props.initial.motifId,
@@ -69,6 +79,7 @@ export function MotifForm(props: Props) {
             libelle: values.libelle,
             montantEuros: values.montantEuros,
             montantVariable: values.montantVariable,
+            reductionEtudiant: values.reductionEtudiant,
             actif: values.actif,
           });
     if (!res.ok) {
@@ -128,6 +139,23 @@ export function MotifForm(props: Props) {
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
             Si coché, le libellé et le montant pourront être modifiés à la saisie d&apos;une amende.
             Sinon, ils seront pré-remplis et verrouillés.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <input
+          type="checkbox"
+          className="mt-1 size-4 rounded border-zinc-300 dark:border-zinc-700"
+          {...register("reductionEtudiant")}
+        />
+        <span>
+          <strong>-50% étudiant</strong>
+          <br />
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Si coché, toute amende déclarée avec ce motif comptera pour moitié (arrondi à
+            l&apos;euro supérieur) dans le total dû des membres étudiants — automatiquement,
+            sans rien à cocher à la saisie.
           </span>
         </span>
       </label>

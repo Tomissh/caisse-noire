@@ -16,7 +16,7 @@ export default async function EditMotifPage({
   const supabase = await createClient();
   const { data: motif } = await supabase
     .from("motifs_amende")
-    .select("id, libelle, montant_centimes, montant_variable, actif")
+    .select("id, libelle, montant_centimes, montant_variable, reduction_etudiant, actif")
     .eq("id", motifId)
     .eq("caisse_id", caisseId)
     .maybeSingle();
@@ -44,6 +44,7 @@ export default async function EditMotifPage({
             libelle: motif.libelle,
             montantEuros: centimesToEuros(motif.montant_centimes),
             montantVariable: motif.montant_variable,
+            reductionEtudiant: motif.reduction_etudiant,
             actif: motif.actif,
           }}
         />

@@ -382,6 +382,7 @@ export type Database = {
           libelle: string
           montant_centimes: number
           montant_variable: boolean
+          reduction_etudiant: boolean
           updated_at: string
         }
         Insert: {
@@ -392,6 +393,7 @@ export type Database = {
           libelle: string
           montant_centimes: number
           montant_variable?: boolean
+          reduction_etudiant?: boolean
           updated_at?: string
         }
         Update: {
@@ -402,6 +404,7 @@ export type Database = {
           libelle?: string
           montant_centimes?: number
           montant_variable?: boolean
+          reduction_etudiant?: boolean
           updated_at?: string
         }
         Relationships: [

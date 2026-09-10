@@ -23,7 +23,7 @@ export default async function NewAmendePage({
   const [motifsRes, membresRes] = await Promise.all([
     supabase
       .from("motifs_amende")
-      .select("id, libelle, montant_centimes, montant_variable")
+      .select("id, libelle, montant_centimes, montant_variable, reduction_etudiant")
       .eq("caisse_id", caisseId)
       .eq("actif", true)
       .order("libelle"),
@@ -40,6 +40,7 @@ export default async function NewAmendePage({
     libelle: m.libelle,
     montantEuros: centimesToEuros(m.montant_centimes),
     montantVariable: m.montant_variable,
+    reductionEtudiant: m.reduction_etudiant,
   }));
   const membres = membresRes.data ?? [];
 

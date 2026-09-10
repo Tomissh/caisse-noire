@@ -26,6 +26,7 @@ const createSchema = z.object({
   libelle,
   montantEuros,
   montantVariable: z.boolean(),
+  reductionEtudiant: z.boolean(),
 });
 
 export async function createMotifAction(input: {
@@ -33,6 +34,7 @@ export async function createMotifAction(input: {
   libelle: string;
   montantEuros: number;
   montantVariable: boolean;
+  reductionEtudiant: boolean;
 }): Promise<Result> {
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Champs invalides" };
@@ -43,6 +45,7 @@ export async function createMotifAction(input: {
     libelle: parsed.data.libelle,
     montant_centimes: eurosToCentimes(parsed.data.montantEuros),
     montant_variable: parsed.data.montantVariable,
+    reduction_etudiant: parsed.data.reductionEtudiant,
   });
   if (error) {
     if (error.code === "23505") return { ok: false, error: "Ce libellé existe déjà" };
@@ -58,6 +61,7 @@ const updateSchema = z.object({
   libelle,
   montantEuros,
   montantVariable: z.boolean(),
+  reductionEtudiant: z.boolean(),
   actif: z.boolean(),
 });
 
@@ -67,6 +71,7 @@ export async function updateMotifAction(input: {
   libelle: string;
   montantEuros: number;
   montantVariable: boolean;
+  reductionEtudiant: boolean;
   actif: boolean;
 }): Promise<Result> {
   const parsed = updateSchema.safeParse(input);
@@ -79,6 +84,7 @@ export async function updateMotifAction(input: {
       libelle: parsed.data.libelle,
       montant_centimes: eurosToCentimes(parsed.data.montantEuros),
       montant_variable: parsed.data.montantVariable,
+      reduction_etudiant: parsed.data.reductionEtudiant,
       actif: parsed.data.actif,
     })
     .eq("id", parsed.data.motifId);

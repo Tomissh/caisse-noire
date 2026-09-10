@@ -33,7 +33,6 @@ const amendeRowSchema = z.object({
   montantEuros: z.number().int().positive().max(10_000),
   membreId: uuid,
   jourMatch: z.boolean(),
-  reductionEtudiant: z.boolean(),
 });
 
 const declareAmendesBatchSchema = z
@@ -51,7 +50,6 @@ export async function declareAmendesBatchAction(input: {
     montantEuros: number;
     membreId: string;
     jourMatch: boolean;
-    reductionEtudiant: boolean;
   }[];
 }): Promise<Result> {
   const parsed = declareAmendesBatchSchema.safeParse(input);
@@ -73,7 +71,9 @@ export async function declareAmendesBatchAction(input: {
     montant_centimes: eurosToCentimes(r.montantEuros),
     declaree_par_user_id: user.id,
     jour_match: r.jourMatch,
-    reduction_etudiant: r.reductionEtudiant,
+    // reduction_etudiant n'est pas envoyé : le trigger
+    // amendes_appliquer_reduction_etudiant_motif le recopie depuis le motif
+    // sélectionné (cf. migration 20260910160000).
   }));
 
   const { error, count } = await supabase

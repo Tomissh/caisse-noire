@@ -19,6 +19,7 @@ type MotifOption = {
   libelle: string;
   montantEuros: number;
   montantVariable: boolean;
+  reductionEtudiant: boolean;
 };
 
 type MembreOption = { id: string; nom: string; etudiant: boolean };

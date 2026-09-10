@@ -21,7 +21,7 @@ export default async function MotifsPage({
   const supabase = await createClient();
   const { data: motifs } = await supabase
     .from("motifs_amende")
-    .select("id, libelle, montant_centimes, montant_variable, actif")
+    .select("id, libelle, montant_centimes, montant_variable, reduction_etudiant, actif")
     .eq("caisse_id", caisseId)
     .order("actif", { ascending: false })
     .order("libelle");
@@ -85,6 +85,11 @@ export default async function MotifsPage({
                   >
                     {m.montant_variable ? "variable" : "fixe"}
                   </span>
+                  {m.reduction_etudiant && (
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+                      -50% étudiant
+                    </span>
+                  )}
                   {!m.actif && (
                     <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
                       désactivé
