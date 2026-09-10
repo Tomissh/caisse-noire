@@ -15,6 +15,7 @@ export function DetteCard({
   membreId,
   nom,
   soldeCentimes,
+  etudiant = false,
   packsCount,
   avatarUrl,
 }: {
@@ -22,6 +23,7 @@ export function DetteCard({
   membreId: string;
   nom: string;
   soldeCentimes: number;
+  etudiant?: boolean;
   packsCount: number;
   avatarUrl: string | null;
 }) {
@@ -35,6 +37,7 @@ export function DetteCard({
         membreId={membreId}
         nom={nom}
         soldeCentimes={soldeCentimes}
+        etudiant={etudiant}
         packsCount={packsCount}
         canEditPacks
         avatarUrl={avatarUrl}

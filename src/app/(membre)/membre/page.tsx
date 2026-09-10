@@ -27,6 +27,7 @@ type Situation = {
   solde_centimes: number | null;
   nom: string;
   actif: boolean;
+  etudiant: boolean;
 };
 
 type Amende = {
@@ -112,7 +113,7 @@ export default function MembreDashboardPage() {
               .maybeSingle(),
             supabase
               .from("membres")
-              .select("id, nom, actif")
+              .select("id, nom, actif, etudiant")
               .eq("caisse_id", claims.caisse_id),
             supabase
               .from("v_membre_situation")
@@ -174,6 +175,7 @@ export default function MembreDashboardPage() {
             solde_centimes: s?.solde_centimes ?? 0,
             nom: m.nom,
             actif: m.actif,
+            etudiant: m.etudiant,
           };
         });
 
@@ -376,6 +378,7 @@ export default function MembreDashboardPage() {
                   membreId={s.membre_id!}
                   nom={s.nom}
                   soldeCentimes={s.solde_centimes ?? 0}
+                  etudiant={s.etudiant}
                   avatarUrl={data.avatarUrlByMembreId.get(s.membre_id ?? "") ?? null}
                   triggerClassName="flex w-full items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/60"
                 >

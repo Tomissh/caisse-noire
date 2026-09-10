@@ -94,7 +94,7 @@ export default async function CaisseDashboardPage({
       .eq("caisse_id", caisseId)
       .is("supprimee_at", null),
     supabase.from("retraits").select("montant_centimes").eq("caisse_id", caisseId),
-    supabase.from("membres").select("id, nom, actif").eq("caisse_id", caisseId),
+    supabase.from("membres").select("id, nom, actif, etudiant").eq("caisse_id", caisseId),
     supabase
       .from("motifs_amende")
       .select("id, libelle, montant_centimes, montant_variable")
@@ -176,6 +176,7 @@ export default async function CaisseDashboardPage({
     .map((m) => ({
       membreId: m.id,
       nom: m.nom,
+      etudiant: m.etudiant,
       solde: soldeByMembreId.get(m.id) ?? 0,
       packs: packsByMembreId.get(m.id) ?? 0,
     }))
@@ -368,6 +369,7 @@ export default async function CaisseDashboardPage({
                   membreId={m.membreId}
                   nom={m.nom}
                   soldeCentimes={m.solde}
+                  etudiant={m.etudiant}
                   packsCount={m.packs}
                   avatarUrl={avatarUrlByMembreId.get(m.membreId) ?? null}
                 />
