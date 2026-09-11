@@ -21,8 +21,6 @@ export type EcritureItem = {
   moyen: "especes" | "virement" | "autre" | null;
   jourMatch: boolean;
   reductionEtudiant: boolean;
-  retard: boolean;
-  joursRetard: number;
   acteurEmail: string;
   supprimeeAt: string | null;
   motifSuppression: string | null;
@@ -128,11 +126,6 @@ export function EcrituresList({
                       -50% étudiant
                     </span>
                   )}
-                  {it.retard && (
-                    <span className="ml-2 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-                      retard +{it.joursRetard}j
-                    </span>
-                  )}
                   {isDeleted && (
                     <span className="ml-2 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
                       supprimée
@@ -184,11 +177,6 @@ export function EcrituresList({
                       )}
                       {it.jourMatch && <div>Jour de match ×2</div>}
                       {it.reductionEtudiant && <div>-50% étudiant</div>}
-                      {it.retard && (
-                        <div>
-                          Retard : {it.joursRetard} j (+{it.joursRetard * 2} €)
-                        </div>
-                      )}
                     </>
                   )}
                   {isDeleted && (

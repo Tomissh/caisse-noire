@@ -12,10 +12,10 @@ import { recordPaiementAction } from "../../_actions";
 // caisse), donc pas de choix à faire à la saisie.
 const MOYEN = "especes" as const;
 
-// Pénalité de retard : 2€ par jour, calculée en base par
-// tg_paiements_appliquer_retard (migration 20260911090000) — l'aperçu
-// affiché ici est indicatif, le frontend ne calcule rien qui parte au
-// serveur (CDC 8.1 #1).
+// Pénalité de retard : 2€ par jour, ajoutée comme une amende distincte (pas
+// dans le montant du paiement) par la RPC enregistrer_paiement (migration
+// 20260911100000) — l'aperçu affiché ici est indicatif, le frontend ne
+// calcule rien qui parte tel quel au serveur (CDC 8.1 #1).
 const PENALITE_RETARD_EUROS_PAR_JOUR = 2;
 
 const schema = z
@@ -71,7 +71,9 @@ export function PaiementForm({
       toast.error(res.error);
       return;
     }
-    toast.success("Paiement enregistré");
+    toast.success(
+      values.retard ? "Paiement enregistré + amende de retard ajoutée" : "Paiement enregistré",
+    );
     if (onSuccess) {
       onSuccess();
     } else {
@@ -125,7 +127,7 @@ export function PaiementForm({
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" className="size-4" {...register("retard")} />
           <span className="text-zinc-700 dark:text-zinc-300">
-            Paiement en retard (+{PENALITE_RETARD_EUROS_PAR_JOUR} € / jour)
+            Paiement en retard (amende de {PENALITE_RETARD_EUROS_PAR_JOUR} € / jour)
           </span>
         </label>
         {retard && (
@@ -145,9 +147,9 @@ export function PaiementForm({
             )}
             {Number.isFinite(joursRetard) && joursRetard >= 1 && Number.isFinite(montantEuros) && (
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Pénalité : {joursRetard * PENALITE_RETARD_EUROS_PAR_JOUR} € ({joursRetard} j ×{" "}
-                {PENALITE_RETARD_EUROS_PAR_JOUR} €) — Montant total :{" "}
-                {montantEuros + joursRetard * PENALITE_RETARD_EUROS_PAR_JOUR} €
+                Paiement enregistré : {montantEuros} € — Amende « Retard de paiement » ajoutée au
+                membre : {joursRetard * PENALITE_RETARD_EUROS_PAR_JOUR} € ({joursRetard} j ×{" "}
+                {PENALITE_RETARD_EUROS_PAR_JOUR} €)
               </p>
             )}
           </div>

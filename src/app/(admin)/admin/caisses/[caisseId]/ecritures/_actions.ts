@@ -7,7 +7,9 @@
 //   saisie multi-lignes du formulaire. Le `motif_id` peut être null (saisie
 //   libre). Le libellé est toujours stocké (copie du catalogue pour
 //   conservation après suppression du motif).
-// - recordPaiementAction : montant positif uniquement, moyen ∈ enum.
+// - recordPaiementAction : montant positif uniquement, moyen ∈ enum. Appelle
+//   la RPC enregistrer_paiement, qui ajoute en base une amende "Retard de
+//   paiement" (joursRetard × 2€) distincte quand un retard est déclaré.
 // - recordRetraitAction : montant euros signé (positif = sortie, négatif =
 //   correction). 0 interdit.
 // - supprimerAmendeAction / supprimerPaiementAction : appel RPC qui valide
@@ -148,18 +150,17 @@ export async function recordPaiementAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Non authentifié" };
 
-  // jours_retard forcé à 0 si retard=false, quelle que soit la valeur
-  // saisie (champ masqué côté formulaire) : la contrainte
-  // paiements_retard_coherent l'exige, la pénalité (2€/jour) est appliquée
-  // par le trigger tg_paiements_appliquer_retard, pas ici.
-  const { error } = await supabase.from("paiements").insert({
-    caisse_id: parsed.data.caisseId,
-    membre_id: parsed.data.membreId,
-    montant_centimes: eurosToCentimes(parsed.data.montantEuros),
-    moyen: parsed.data.moyen,
-    enregistre_par_user_id: user.id,
-    retard: parsed.data.retard,
-    jours_retard: parsed.data.retard ? parsed.data.joursRetard : 0,
+  // RPC enregistrer_paiement (migration 20260911100000) : insère le
+  // paiement pour le montant saisi tel quel, puis — si joursRetard > 0 —
+  // une amende distincte "Retard de paiement" de joursRetard × 2€,
+  // atomiquement (un seul appel serveur, cf. CDC 8.1 #1). Le retard
+  // s'ajoute au total dû du membre, il ne gonfle pas le paiement lui-même.
+  const { error } = await supabase.rpc("enregistrer_paiement", {
+    p_caisse_id: parsed.data.caisseId,
+    p_membre_id: parsed.data.membreId,
+    p_montant_centimes: eurosToCentimes(parsed.data.montantEuros),
+    p_moyen: parsed.data.moyen,
+    p_jours_retard: parsed.data.retard ? parsed.data.joursRetard : 0,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/caisses/${parsed.data.caisseId}/ecritures`);

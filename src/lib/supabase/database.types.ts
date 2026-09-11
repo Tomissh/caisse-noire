@@ -493,12 +493,10 @@ export type Database = {
           created_at: string
           enregistre_par_user_id: string
           id: string
-          jours_retard: number
           membre_id: string
           montant_centimes: number
           motif_suppression: string | null
           moyen: Database["public"]["Enums"]["moyen_paiement"]
-          retard: boolean
           supprimee_at: string | null
           supprimee_par_user_id: string | null
         }
@@ -507,12 +505,10 @@ export type Database = {
           created_at?: string
           enregistre_par_user_id: string
           id?: string
-          jours_retard?: number
           membre_id: string
           montant_centimes: number
           motif_suppression?: string | null
           moyen: Database["public"]["Enums"]["moyen_paiement"]
-          retard?: boolean
           supprimee_at?: string | null
           supprimee_par_user_id?: string | null
         }
@@ -521,12 +517,10 @@ export type Database = {
           created_at?: string
           enregistre_par_user_id?: string
           id?: string
-          jours_retard?: number
           membre_id?: string
           montant_centimes?: number
           motif_suppression?: string | null
           moyen?: Database["public"]["Enums"]["moyen_paiement"]
-          retard?: boolean
           supprimee_at?: string | null
           supprimee_par_user_id?: string | null
         }
@@ -689,6 +683,16 @@ export type Database = {
       caisse_est_ouverte: { Args: { p_caisse_id: string }; Returns: boolean }
       cloturer_caisse: { Args: { p_caisse_id: string }; Returns: undefined }
       current_membre_id: { Args: never; Returns: string }
+      enregistrer_paiement: {
+        Args: {
+          p_caisse_id: string
+          p_jours_retard?: number
+          p_membre_id: string
+          p_montant_centimes: number
+          p_moyen: Database["public"]["Enums"]["moyen_paiement"]
+        }
+        Returns: string
+      }
       generer_cotisations_mois: {
         Args: { p_caisse_id: string; p_mois: string }
         Returns: number
