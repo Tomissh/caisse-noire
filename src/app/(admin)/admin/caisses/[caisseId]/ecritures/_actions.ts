@@ -116,18 +116,27 @@ export async function supprimerAmendeAction(input: {
 
 const moyenPaiement = z.enum(["especes", "virement", "autre"]);
 
-const recordPaiementSchema = z.object({
-  caisseId: uuid,
-  membreId: uuid,
-  montantEuros: z.number().int().positive().max(10_000),
-  moyen: moyenPaiement,
-});
+const recordPaiementSchema = z
+  .object({
+    caisseId: uuid,
+    membreId: uuid,
+    montantEuros: z.number().int().positive().max(10_000),
+    moyen: moyenPaiement,
+    retard: z.boolean(),
+    joursRetard: z.number().int().min(0).max(365),
+  })
+  .refine((v) => !v.retard || v.joursRetard >= 1, {
+    message: "Indiquez au moins 1 jour de retard",
+    path: ["joursRetard"],
+  });
 
 export async function recordPaiementAction(input: {
   caisseId: string;
   membreId: string;
   montantEuros: number;
   moyen: "especes" | "virement" | "autre";
+  retard: boolean;
+  joursRetard: number;
 }): Promise<Result> {
   const parsed = recordPaiementSchema.safeParse(input);
   if (!parsed.success) {
@@ -139,12 +148,18 @@ export async function recordPaiementAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Non authentifié" };
 
+  // jours_retard forcé à 0 si retard=false, quelle que soit la valeur
+  // saisie (champ masqué côté formulaire) : la contrainte
+  // paiements_retard_coherent l'exige, la pénalité (2€/jour) est appliquée
+  // par le trigger tg_paiements_appliquer_retard, pas ici.
   const { error } = await supabase.from("paiements").insert({
     caisse_id: parsed.data.caisseId,
     membre_id: parsed.data.membreId,
     montant_centimes: eurosToCentimes(parsed.data.montantEuros),
     moyen: parsed.data.moyen,
     enregistre_par_user_id: user.id,
+    retard: parsed.data.retard,
+    jours_retard: parsed.data.retard ? parsed.data.joursRetard : 0,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/caisses/${parsed.data.caisseId}/ecritures`);

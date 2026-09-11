@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -12,10 +12,23 @@ import { recordPaiementAction } from "../../_actions";
 // caisse), donc pas de choix à faire à la saisie.
 const MOYEN = "especes" as const;
 
-const schema = z.object({
-  membreId: z.uuid("Sélectionnez un membre"),
-  montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
-});
+// Pénalité de retard : 2€ par jour, calculée en base par
+// tg_paiements_appliquer_retard (migration 20260911090000) — l'aperçu
+// affiché ici est indicatif, le frontend ne calcule rien qui parte au
+// serveur (CDC 8.1 #1).
+const PENALITE_RETARD_EUROS_PAR_JOUR = 2;
+
+const schema = z
+  .object({
+    membreId: z.uuid("Sélectionnez un membre"),
+    montantEuros: z.number().int("Euros entiers").positive("> 0").max(10_000),
+    retard: z.boolean(),
+    joursRetard: z.number().int("Jours entiers").min(0).max(365),
+  })
+  .refine((v) => !v.retard || v.joursRetard >= 1, {
+    message: "Indiquez au moins 1 jour de retard",
+    path: ["joursRetard"],
+  });
 type FormValues = z.infer<typeof schema>;
 
 export function PaiementForm({
@@ -33,16 +46,26 @@ export function PaiementForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { membreId: "", montantEuros: 10 },
+    defaultValues: { membreId: "", montantEuros: 10, retard: false, joursRetard: 1 },
   });
+
+  const retard = useWatch({ control, name: "retard" });
+  const joursRetard = useWatch({ control, name: "joursRetard" });
+  const montantEuros = useWatch({ control, name: "montantEuros" });
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
-    const res = await recordPaiementAction({ caisseId, ...values, moyen: MOYEN });
+    const res = await recordPaiementAction({
+      caisseId,
+      ...values,
+      joursRetard: values.retard ? values.joursRetard : 0,
+      moyen: MOYEN,
+    });
     if (!res.ok) {
       setServerError(res.error);
       toast.error(res.error);
@@ -94,6 +117,40 @@ export function PaiementForm({
         />
         {errors.montantEuros && (
           <p className="text-xs text-red-600 dark:text-red-400">{errors.montantEuros.message}</p>
+        )}
+      </div>
+
+      {/* Retard --------------------------------------------------------- */}
+      <div className="space-y-1">
+        <label className="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" className="size-4" {...register("retard")} />
+          <span className="text-zinc-700 dark:text-zinc-300">
+            Paiement en retard (+{PENALITE_RETARD_EUROS_PAR_JOUR} € / jour)
+          </span>
+        </label>
+        {retard && (
+          <div className="space-y-1 pt-1">
+            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              Nombre de jours de retard
+            </label>
+            <input
+              type="number"
+              step={1}
+              min={1}
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+              {...register("joursRetard", { valueAsNumber: true })}
+            />
+            {errors.joursRetard && (
+              <p className="text-xs text-red-600 dark:text-red-400">{errors.joursRetard.message}</p>
+            )}
+            {Number.isFinite(joursRetard) && joursRetard >= 1 && Number.isFinite(montantEuros) && (
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Pénalité : {joursRetard * PENALITE_RETARD_EUROS_PAR_JOUR} € ({joursRetard} j ×{" "}
+                {PENALITE_RETARD_EUROS_PAR_JOUR} €) — Montant total :{" "}
+                {montantEuros + joursRetard * PENALITE_RETARD_EUROS_PAR_JOUR} €
+              </p>
+            )}
+          </div>
         )}
       </div>
 

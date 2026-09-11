@@ -43,6 +43,8 @@ type Paiement = {
   id: string;
   montant_centimes: number;
   moyen: "especes" | "virement" | "autre";
+  retard: boolean;
+  jours_retard: number;
   created_at: string;
 };
 
@@ -135,7 +137,7 @@ export default function MembreDashboardPage() {
               .limit(20),
             supabase
               .from("paiements")
-              .select("id, montant_centimes, moyen, created_at")
+              .select("id, montant_centimes, moyen, retard, jours_retard, created_at")
               .eq("caisse_id", claims.caisse_id)
               .eq("membre_id", claims.membre_id)
               .is("supprimee_at", null)
@@ -358,6 +360,7 @@ export default function MembreDashboardPage() {
             primary: MOYEN_LABEL[p.moyen],
             secondary: formatDate(p.created_at),
             amount: p.montant_centimes,
+            badge: p.retard ? `retard +${Number(p.jours_retard)}j` : null,
           }))}
           fullCount={data.paiements.length}
         />

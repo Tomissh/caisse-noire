@@ -493,10 +493,12 @@ export type Database = {
           created_at: string
           enregistre_par_user_id: string
           id: string
+          jours_retard: number
           membre_id: string
           montant_centimes: number
           motif_suppression: string | null
           moyen: Database["public"]["Enums"]["moyen_paiement"]
+          retard: boolean
           supprimee_at: string | null
           supprimee_par_user_id: string | null
         }
@@ -505,10 +507,12 @@ export type Database = {
           created_at?: string
           enregistre_par_user_id: string
           id?: string
+          jours_retard?: number
           membre_id: string
           montant_centimes: number
           motif_suppression?: string | null
           moyen: Database["public"]["Enums"]["moyen_paiement"]
+          retard?: boolean
           supprimee_at?: string | null
           supprimee_par_user_id?: string | null
         }
@@ -517,10 +521,12 @@ export type Database = {
           created_at?: string
           enregistre_par_user_id?: string
           id?: string
+          jours_retard?: number
           membre_id?: string
           montant_centimes?: number
           motif_suppression?: string | null
           moyen?: Database["public"]["Enums"]["moyen_paiement"]
+          retard?: boolean
           supprimee_at?: string | null
           supprimee_par_user_id?: string | null
         }

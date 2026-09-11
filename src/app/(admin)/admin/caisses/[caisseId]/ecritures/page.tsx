@@ -123,7 +123,7 @@ export default async function EcrituresPage({
         let q = supabase
           .from("paiements")
           .select(
-            "id, caisse_id, membre_id, montant_centimes, moyen, enregistre_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, nom)",
+            "id, caisse_id, membre_id, montant_centimes, moyen, retard, jours_retard, enregistre_par_user_id, supprimee_at, supprimee_par_user_id, motif_suppression, created_at, membres(id, nom)",
           )
           .eq("caisse_id", caisseId)
           .order("created_at", { ascending: false })
@@ -198,6 +198,8 @@ export default async function EcrituresPage({
       moyen: null,
       jourMatch: a.jour_match,
       reductionEtudiant: a.reduction_etudiant,
+      retard: false,
+      joursRetard: 0,
       acteurEmail: emailById.get(a.declaree_par_user_id) ?? a.declaree_par_user_id.slice(0, 8),
       supprimeeAt: a.supprimee_at,
       motifSuppression: a.motif_suppression,
@@ -219,6 +221,8 @@ export default async function EcrituresPage({
       moyen: p.moyen,
       jourMatch: false,
       reductionEtudiant: false,
+      retard: p.retard,
+      joursRetard: Number(p.jours_retard),
       acteurEmail: emailById.get(p.enregistre_par_user_id) ?? p.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: p.supprimee_at,
       motifSuppression: p.motif_suppression,
@@ -239,6 +243,8 @@ export default async function EcrituresPage({
       moyen: null,
       jourMatch: false,
       reductionEtudiant: false,
+      retard: false,
+      joursRetard: 0,
       acteurEmail: emailById.get(r.enregistre_par_user_id) ?? r.enregistre_par_user_id.slice(0, 8),
       supprimeeAt: null,
       motifSuppression: null,
